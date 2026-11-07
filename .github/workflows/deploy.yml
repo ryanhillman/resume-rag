@@ -1,0 +1,94 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - run: pip install ruff==0.15.2
+      - run: ruff check app/ tests/
+
+  audit:
+    name: Audit dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - run: pip install pip-audit
+      - run: pip-audit -r requirements.txt
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt pytest httpx fpdf2
+      - run: pytest tests/
+
+  validate-terraform:
+    name: Validate Terraform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
+      - run: terraform -chdir=infra init -backend=false
+      - run: terraform -chdir=infra validate
+      - run: terraform -chdir=infra fmt -check
+
+  deploy:
+    name: Deploy to VM
+    runs-on: ubuntu-latest
+    needs: [lint, audit, test, validate-terraform]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VM_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.VM_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Sync code
+        env:
+          VM_USER: ${{ vars.VM_USER }}
+          VM_HOST: ${{ secrets.VM_HOST }}
+        run: |
+          rsync -az -e "ssh -i ~/.ssh/deploy_key" --delete \
+            --exclude='.env' \
+            --exclude='.git/' \
+            --exclude='__pycache__/' \
+            --exclude='infra/' \
+            --exclude='.github/' \
+            app/ ${VM_USER}@${VM_HOST}:~/app/
+          rsync -az -e "ssh -i ~/.ssh/deploy_key" \
+            Dockerfile \
+            .dockerignore \
+            docker-compose.yml \
+            requirements.txt \
+            Caddyfile \
+            ${VM_USER}@${VM_HOST}:~/
+
+      - name: Rebuild containers
+        env:
+          VM_USER: ${{ vars.VM_USER }}
+          VM_HOST: ${{ secrets.VM_HOST }}
+        run: |
+          ssh -i ~/.ssh/deploy_key ${VM_USER}@${VM_HOST} \
+            "docker compose --env-file ~/.env up -d --build --remove-orphans 2>&1"

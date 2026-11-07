@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Resume RAG</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f8f9fa; color: #212529; padding: 40px 16px;
+    }
+    .container { max-width: 680px; margin: 0 auto; }
+    h1 { font-size: 1.5rem; font-weight: 600; margin-bottom: 8px; }
+    p.subtitle { color: #6c757d; margin-bottom: 32px; font-size: 0.95rem; }
+    .card { background: #fff; border: 1px solid #dee2e6; border-radius: 8px; padding: 24px; margin-bottom: 20px; }
+    h2 { font-size: 1rem; font-weight: 600; margin-bottom: 14px; color: #495057; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    input[type="file"] { flex: 1; min-width: 0; font-size: 0.9rem; }
+    input[type="text"] {
+      flex: 1; min-width: 0; padding: 8px 12px;
+      border: 1px solid #ced4da; border-radius: 6px; font-size: 0.95rem;
+    }
+    button {
+      padding: 8px 18px; background: #0d6efd; color: #fff;
+      border: none; border-radius: 6px; font-size: 0.9rem; cursor: pointer; white-space: nowrap;
+    }
+    button:hover { background: #0b5ed7; }
+    .status { margin-top: 10px; font-size: 0.88rem; color: #6c757d; min-height: 20px; }
+    .status.error { color: #dc3545; }
+    .resume-row { display: flex; align-items: center; justify-content: space-between; font-size: 0.9rem; gap: 6px; }
+    .resume-row .name { flex: 1; }
+    .resume-row .badge { font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; }
+    .badge-ready { background: #d1e7dd; color: #0a3622; }
+    .badge-ingesting { background: #fff3cd; color: #664d03; }
+    .badge-failed { background: #f8d7da; color: #58151c; }
+    .badge-inject { background: #f8d7da; color: #58151c; font-size: 0.7rem; cursor: help; }
+    .btn-sm { padding: 3px 10px; background: #fff; border-radius: 4px; font-size: 0.8rem; cursor: pointer; }
+    .resume-card { padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
+    .resume-card:last-child { border-bottom: none; }
+    .resume-row { display: flex; align-items: center; justify-content: space-between; font-size: 0.9rem; gap: 6px; }
+    .tag-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+    .tag-chip {
+      display: inline-flex; align-items: center; padding: 1px 7px; border-radius: 10px;
+      font-size: 0.72rem; font-weight: 500; cursor: pointer; border: none; outline: none;
+      transition: opacity 0.12s; white-space: nowrap; user-select: none;
+    }
+    .tag-chip.off { opacity: 0.2; }
+    .filter-bar { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px; align-items: center; }
+    .filter-chip {
+      display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 10px;
+      font-size: 0.78rem; font-weight: 500; cursor: pointer; border: 1.5px solid transparent;
+      transition: opacity 0.12s, border-color 0.12s; white-space: nowrap; user-select: none;
+    }
+    .filter-chip.off { opacity: 0.35; }
+    .filter-chip.on { border-color: currentColor; }
+    .btn-download { color: #0d6efd; border: 1px solid #0d6efd; }
+    .btn-download:hover { background: #0d6efd; color: #fff; }
+    .btn-delete { color: #dc3545; border: 1px solid #dc3545; }
+    .btn-delete:hover { background: #dc3545; color: #fff; }
+    #chatOutput {
+      margin-top: 12px; word-break: break-word;
+      background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px;
+      padding: 12px; font-size: 0.9rem; min-height: 48px; line-height: 1.6;
+    }
+    #chatOutput p { margin: 0 0 8px; }
+    #chatOutput p:last-child { margin-bottom: 0; }
+    #chatOutput strong { font-weight: 600; }
+    #chatOutput ul, #chatOutput ol { padding-left: 20px; margin: 4px 0 8px; }
+    #chatOutput li { margin-bottom: 2px; }
+    #chatOutput h1, #chatOutput h2, #chatOutput h3 { margin: 8px 0 4px; font-size: 1rem; }
+    #resumeSuggestions {
+      position: absolute; top: 100%; left: 0; right: 0;
+      background: #fff; border: 1px solid #ced4da; border-top: none;
+      border-radius: 0 0 6px 6px; z-index: 10; display: none;
+      max-height: 160px; overflow-y: auto; box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+    }
+    .suggestion { padding: 7px 12px; cursor: pointer; font-size: 0.9rem; }
+    .suggestion:hover { background: #f8f9fa; }
+    .scope-clear { font-size: 0.78rem; color: #0d6efd; cursor: pointer; margin-left: 6px; }
+    .scope-clear:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+      <h1>Resume RAG</h1>
+      <form method="post" action="/logout" style="margin:0">
+        <button type="submit" style="background:none;color:#6c757d;border:none;padding:0;font-size:0.85rem;cursor:pointer;text-decoration:underline">Sign out</button>
+      </form>
+    </div>
+    <p class="subtitle">Upload resumes, then ask questions about them.</p>
+
+    <div class="card">
+      <h2>1 — Upload resume</h2>
+      <div class="row">
+        <input type="file" id="fileInput" accept=".pdf" />
+        <button id="uploadBtn">Upload</button>
+      </div>
+      <div id="uploadTagRow" class="tag-row" style="margin-top:10px"></div>
+      <div class="status" id="uploadStatus"></div>
+    </div>
+
+    <div class="card">
+      <h2>Uploaded resumes</h2>
+      <div id="tagFilter" class="filter-bar"></div>
+      <div id="resumeList"></div>
+      <div class="status" id="deleteStatus"></div>
+    </div>
+
+    <div class="card">
+      <h2>2 — Ask a question</h2>
+      <div style="position:relative;margin-bottom:8px">
+        <input type="text" id="resumeSearch" placeholder="Or search by name to drill into one resume…" autocomplete="off" />
+        <div id="resumeSuggestions"></div>
+      </div>
+      <div id="scopeLabel" style="font-size:0.82rem;color:#6c757d;margin-bottom:10px">Asking about: all resumes</div>
+      <div class="row">
+        <input type="text" id="messageInput" placeholder="e.g. What are their top skills?" />
+        <button id="sendBtn">Send</button>
+      </div>
+      <div id="chatOutput"></div>
+    </div>
+  </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/18.1.3/lib/marked.umd.min.js"
+        integrity="sha512-aGS0R+ig5xP86FA70qY4Rk8EstGqd6T0r60hdSAIEMN4LicYom0kwwNl6IsqQ3lYHEGsgQI0cmIRpUBl9vSpmw=="
+        crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.4.17/purify.min.js"
+        integrity="sha512-2wT0W6vojz3cJuLoa/DxrPVQRinkfRjFWMWIDK4NghTqObEhpem1nEkeK0d9ZE+/hyvfMNuJZlfxM4LsRgeoSA=="
+        crossorigin="anonymous"></script>
+<script src="/app.js"></script>
+</body>
+</html>
