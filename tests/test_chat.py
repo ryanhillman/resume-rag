@@ -3,9 +3,11 @@ from unittest.mock import patch
 
 def _fake_call_llm(names):
     """Echo back which candidate names reached the prompt."""
+
     def fake(message, chunks, scope_note=""):
         seen = [n for n in names if any(n in c for c in chunks)]
         return "Ranking: " + ", ".join(seen)
+
     return fake
 
 
@@ -25,7 +27,8 @@ def test_tag_scope_sends_every_candidate(client):
         patch("app.main._retrieve_chunks", side_effect=AssertionError("explicit scope must not rank")),
     ):
         res = client.post(
-            "/chat", json={"message": "rank the Kubernetes people", "tags": ["Kubernetes"]},
+            "/chat",
+            json={"message": "rank the Kubernetes people", "tags": ["Kubernetes"]},
         )
 
     assert res.status_code == 200

@@ -75,6 +75,7 @@ def test_rejects_duplicate_upload(client):
 
 # --- Retry failed ingests ---
 
+
 def test_retry_failed_resume(client):
     resume = {"resume_id": "abc", "filename": "r.pdf", "status": "failed", "candidate_name": "Rae Park"}
     with (
@@ -109,8 +110,10 @@ def test_retry_missing_resume(client):
 
 # --- Contact extraction ---
 
+
 def test_extract_contact_fields():
     from app.main import _extract_contact
+
     text = "Tom Becker\nSenior Engineer\ntom.becker@example.com | (555) 123-4567"
     name, email, phone = _extract_contact(text, "tom_becker_resume.pdf")
     assert name == "Tom Becker"
@@ -120,6 +123,7 @@ def test_extract_contact_fields():
 
 def test_extract_contact_falls_back_to_filename():
     from app.main import _extract_contact
+
     name, email, phone = _extract_contact("EXPERIENCE\nbuilt things 2019-2023", "tom_becker_resume.pdf")
     assert name == "Tom Becker Resume"
     assert email is None
@@ -127,6 +131,7 @@ def test_extract_contact_falls_back_to_filename():
 
 
 # --- File serving ---
+
 
 def test_resume_file_inline_by_default(client):
     with (

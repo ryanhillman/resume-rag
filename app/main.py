@@ -57,7 +57,7 @@ AZURE_V1_URL = f"{AZURE_EMBED_ENDPOINT}/openai/v1"
 CHUNK_SIZE = 600
 CHUNK_OVERLAP = 80
 MAX_UPLOAD_BYTES = 5_000_000  # 5 MB — generous for a 1-page resume
-TOP_K_PER_CANDIDATE = 2   # chunks per candidate for unfiltered questions
+TOP_K_PER_CANDIDATE = 2  # chunks per candidate for unfiltered questions
 MAX_POOL_CANDIDATES = 40  # similarity-ranked candidates for unfiltered questions
 
 ALLOWED_EXTENSIONS = {".pdf"}
@@ -82,42 +82,54 @@ SYSTEM_PROMPT = (
 _ROSTER_RE = re.compile(r"\b(rank|compare|list|all|everyone|how many)\b", re.I)
 
 TAGS: dict[str, dict[str, str]] = {
-    "Java":             {"bg": "#fed7aa", "text": "#7c2d12"},
-    "Python":           {"bg": "#bfdbfe", "text": "#1e3a8a"},
-    "JavaScript":       {"bg": "#fef08a", "text": "#854d0e"},
-    "SQL":              {"bg": "#fbcfe8", "text": "#831843"},
-    "Mobile":           {"bg": "#e0e7ff", "text": "#3730a3"},
-    "C#":               {"bg": "#c7d2fe", "text": "#3730a3"},
-    "R":                {"bg": "#fce7f3", "text": "#9d174d"},
-    "ML":               {"bg": "#dbeafe", "text": "#1e40af"},
-    "Kubernetes":       {"bg": "#e0f2fe", "text": "#0369a1"},
-    "Gen AI":           {"bg": "#fae8ff", "text": "#701a75"},
-    "LLMs":             {"bg": "#ede9fe", "text": "#5b21b6"},
-    "RAG":              {"bg": "#a7f3d0", "text": "#065f46"},
-    "AWS":              {"bg": "#ffedd5", "text": "#c2410c"},
-    "GCP":              {"bg": "#d1fae5", "text": "#166534"},
-    "Azure":            {"bg": "#bae6fd", "text": "#0369a1"},
-    "Oracle":           {"bg": "#fca5a5", "text": "#7f1d1d"},
-    "Data":             {"bg": "#99f6e4", "text": "#134e4a"},
-    "IaC":              {"bg": "#f1f5f9", "text": "#334155"},
-    "DevOps":           {"bg": "#cbd5e1", "text": "#1e293b"},
-    "Networks":         {"bg": "#c7d2fe", "text": "#312e81"},
-    "Security":         {"bg": "#fecaca", "text": "#7f1d1d"},
-    "Management":       {"bg": "#fde68a", "text": "#78350f"},
-    "Senior":           {"bg": "#bbf7d0", "text": "#14532d"},
-    "Junior":           {"bg": "#d9f99d", "text": "#365314"},
+    "Java": {"bg": "#fed7aa", "text": "#7c2d12"},
+    "Python": {"bg": "#bfdbfe", "text": "#1e3a8a"},
+    "JavaScript": {"bg": "#fef08a", "text": "#854d0e"},
+    "SQL": {"bg": "#fbcfe8", "text": "#831843"},
+    "Mobile": {"bg": "#e0e7ff", "text": "#3730a3"},
+    "C#": {"bg": "#c7d2fe", "text": "#3730a3"},
+    "R": {"bg": "#fce7f3", "text": "#9d174d"},
+    "ML": {"bg": "#dbeafe", "text": "#1e40af"},
+    "Kubernetes": {"bg": "#e0f2fe", "text": "#0369a1"},
+    "Gen AI": {"bg": "#fae8ff", "text": "#701a75"},
+    "LLMs": {"bg": "#ede9fe", "text": "#5b21b6"},
+    "RAG": {"bg": "#a7f3d0", "text": "#065f46"},
+    "AWS": {"bg": "#ffedd5", "text": "#c2410c"},
+    "GCP": {"bg": "#d1fae5", "text": "#166534"},
+    "Azure": {"bg": "#bae6fd", "text": "#0369a1"},
+    "Oracle": {"bg": "#fca5a5", "text": "#7f1d1d"},
+    "Data": {"bg": "#99f6e4", "text": "#134e4a"},
+    "IaC": {"bg": "#f1f5f9", "text": "#334155"},
+    "DevOps": {"bg": "#cbd5e1", "text": "#1e293b"},
+    "Networks": {"bg": "#c7d2fe", "text": "#312e81"},
+    "Security": {"bg": "#fecaca", "text": "#7f1d1d"},
+    "Management": {"bg": "#fde68a", "text": "#78350f"},
+    "Senior": {"bg": "#bbf7d0", "text": "#14532d"},
+    "Junior": {"bg": "#d9f99d", "text": "#365314"},
 }
 
-_WEAK_PASSWORDS: frozenset[str] = frozenset({
-    "change_me", "changeme", "password", "password1", "password123",
-    "admin", "admin123", "letmein", "123456", "secret", "welcome", "default",
-})
+_WEAK_PASSWORDS: frozenset[str] = frozenset(
+    {
+        "change_me",
+        "changeme",
+        "password",
+        "password1",
+        "password123",
+        "admin",
+        "admin123",
+        "letmein",
+        "123456",
+        "secret",
+        "welcome",
+        "default",
+    }
+)
 _MIN_PASSWORD_LEN = 12
 
 # Per-IP failed login tracking: ip → list of failure timestamps
 _LOGIN_ATTEMPTS: dict[str, list[float]] = {}
 _LOGIN_MAX_FAILURES = 5
-_LOGIN_LOCKOUT_SECS = 900   # 15 minutes
+_LOGIN_LOCKOUT_SECS = 900  # 15 minutes
 SESSION_TTL_SECS = 8 * 3600
 
 
@@ -162,6 +174,7 @@ def _session_valid(token: str) -> bool:
             )
             return cur.fetchone() is not None
 
+
 # ── PDF sanitisation ───────────────────────────────────────────────────────────
 
 SUSPICIOUS = re.compile(
@@ -191,15 +204,19 @@ def extract_visible_text(pdf_bytes: bytes) -> tuple[str, list[str], int]:
         if page_count > 1:
             return "", [], page_count
         for page in pdf.pages:
+
             def _visible(obj, _p=page):
                 if obj.get("object_type") != "char":
                     return True
                 return not (
                     _is_white(obj.get("non_stroking_color"))
                     or (obj.get("size") or 10) < 4
-                    or obj["x1"] < 0 or obj["x0"] > _p.width
-                    or obj["bottom"] < 0 or obj["top"] > _p.height
+                    or obj["x1"] < 0
+                    or obj["x0"] > _p.width
+                    or obj["bottom"] < 0
+                    or obj["top"] > _p.height
                 )
+
             raw = page.extract_text() or ""
             vis = page.filter(_visible).extract_text() or ""
             if len(raw) - len(vis) > 20:
@@ -227,6 +244,7 @@ def require_api_key(
 
 
 # ── Postgres ───────────────────────────────────────────────────────────────────
+
 
 @contextmanager
 def _pg():
@@ -306,10 +324,7 @@ def _init_db():
                     cmetadata     JSON
                 )
             """)
-            cur.execute(
-                "CREATE INDEX IF NOT EXISTS idx_embedding_collection"
-                " ON rag_embedding (collection_id)"
-            )
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_embedding_collection ON rag_embedding (collection_id)")
             cur.execute("UPDATE resumes SET status = 'failed' WHERE status = 'ingesting'")
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS sessions (
@@ -341,8 +356,15 @@ def _sessions_purge() -> None:
 
 
 def _register_resume(
-    resume_id: str, filename: str, content: bytes, content_type: str, flags: list,
-    content_hash: str, candidate_name: str, email: Optional[str], phone: Optional[str],
+    resume_id: str,
+    filename: str,
+    content: bytes,
+    content_type: str,
+    flags: list,
+    content_hash: str,
+    candidate_name: str,
+    email: Optional[str],
+    phone: Optional[str],
 ):
     with _pg() as conn:
         with conn.cursor() as cur:
@@ -351,8 +373,17 @@ def _register_resume(
                 " (resume_id, filename, content_type, file_data, flags, content_hash,"
                 "  candidate_name, email, phone)"
                 " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                (resume_id, filename, content_type, psycopg2.Binary(content), flags,
-                 content_hash, candidate_name, email, phone),
+                (
+                    resume_id,
+                    filename,
+                    content_type,
+                    psycopg2.Binary(content),
+                    flags,
+                    content_hash,
+                    candidate_name,
+                    email,
+                    phone,
+                ),
             )
 
 
@@ -396,8 +427,7 @@ def _claim_failed_resume(resume_id: str) -> bool:
     with _pg() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "UPDATE resumes SET status = 'ingesting'"
-                " WHERE resume_id = %s AND status = 'failed'",
+                "UPDATE resumes SET status = 'ingesting' WHERE resume_id = %s AND status = 'failed'",
                 (resume_id,),
             )
             return cur.rowcount == 1
@@ -416,8 +446,7 @@ def _get_resume(resume_id: str) -> Optional[dict]:
     with _pg() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
-                "SELECT resume_id, filename, status, candidate_name, email, phone"
-                " FROM resumes WHERE resume_id = %s",
+                "SELECT resume_id, filename, status, candidate_name, email, phone FROM resumes WHERE resume_id = %s",
                 (resume_id,),
             )
             row = cur.fetchone()
@@ -472,8 +501,7 @@ def _get_candidates(resume_ids: Optional[list[str]] = None) -> list[dict]:
                 (resume_ids, resume_ids),
             )
             return [
-                {"resume_id": rid, "candidate_name": name or _candidate_name(fn)}
-                for rid, name, fn in cur.fetchall()
+                {"resume_id": rid, "candidate_name": name or _candidate_name(fn)} for rid, name, fn in cur.fetchall()
             ]
 
 
@@ -490,16 +518,20 @@ def _get_resume_ids_by_tags(tags: list[str]) -> list[str]:
 
 # ── PGVector helpers ───────────────────────────────────────────────────────────
 
+
 def _drop_resume_vectors(resume_id: str):
     with _pg() as conn:
         with conn.cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 DELETE FROM rag_embedding
                 WHERE collection_id = (
                     SELECT uuid FROM rag_collection WHERE name = 'all_resumes'
                 )
                 AND cmetadata->>'resume_id' = %s
-            """, (resume_id,))
+            """,
+                (resume_id,),
+            )
 
 
 def _candidate_name(filename: str) -> str:
@@ -528,6 +560,7 @@ def _extract_contact(text: str, filename: str) -> tuple[str, Optional[str], Opti
 
 
 # ── Chunking and embedding ─────────────────────────────────────────────────────
+
 
 def _chunk_text(text: str) -> list[str]:
     """Split text into overlapping chunks at natural boundaries.
@@ -607,8 +640,7 @@ def _ensure_collection(cur, name: str) -> str:
     if row:
         return row[0]
     cur.execute(
-        "INSERT INTO rag_collection (uuid, name, cmetadata)"
-        " VALUES (gen_random_uuid(), %s, '{}') RETURNING uuid",
+        "INSERT INTO rag_collection (uuid, name, cmetadata) VALUES (gen_random_uuid(), %s, '{}') RETURNING uuid",
         (name,),
     )
     return cur.fetchone()[0]
@@ -637,19 +669,23 @@ def _write_chunks_to_pgvector(
 
 # ── RAG retrieval and answer generation ───────────────────────────────────────
 
+
 def _fetch_all_chunks(resume_ids: list[str]) -> list[str]:
     """Every chunk for an explicit scope (single resume or tag filter):
     no similarity ranking, no candidate cap, no question embedding."""
     with _pg() as conn:
         with conn.cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT e.document
                 FROM rag_embedding e
                 JOIN rag_collection c ON e.collection_id = c.uuid
                 WHERE c.name = 'all_resumes'
                   AND e.cmetadata->>'resume_id' = ANY(%s)
                 ORDER BY e.cmetadata->>'resume_id'
-            """, (resume_ids,))
+            """,
+                (resume_ids,),
+            )
             return [row[0] for row in cur.fetchall()]
 
 
@@ -659,7 +695,8 @@ def _retrieve_chunks(query_embedding: list[float]) -> list[str]:
     vec = "[" + ",".join(str(x) for x in query_embedding) + "]"
     with _pg() as conn:
         with conn.cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 WITH dists AS (
                     SELECT e.document,
                            e.cmetadata->>'resume_id' AS rid,
@@ -681,7 +718,9 @@ def _retrieve_chunks(query_embedding: list[float]) -> list[str]:
                 SELECT document FROM ranked
                 WHERE rid IN (SELECT rid FROM top_cands) AND rn <= %s
                 ORDER BY best_score, rn
-            """, (vec, MAX_POOL_CANDIDATES, TOP_K_PER_CANDIDATE))
+            """,
+                (vec, MAX_POOL_CANDIDATES, TOP_K_PER_CANDIDATE),
+            )
             return [row[0] for row in cur.fetchall()]
 
 
@@ -727,12 +766,12 @@ def _call_llm(message: str, chunks: list[str], scope_note: str = "") -> str:
 
 # ── App lifecycle ──────────────────────────────────────────────────────────────
 
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     if not API_KEY:
         raise RuntimeError(
-            "APP_API_KEY is not set. Generate one with: "
-            "python3 -c \"import secrets; print(secrets.token_urlsafe(32))\""
+            'APP_API_KEY is not set. Generate one with: python3 -c "import secrets; print(secrets.token_urlsafe(32))"'
         )
     if not UI_PASSWORD:
         raise RuntimeError("UI_PASSWORD must be set")
@@ -799,6 +838,7 @@ async def _csrf_check(request: Request, call_next):
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
+
 class ChatRequest(BaseModel):
     message: str
     resume_id: Optional[str] = None
@@ -831,6 +871,7 @@ def _retry_ingest(resume_id: str, filename: str, content: bytes, candidate_name:
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
+
 
 @app.get("/health")
 async def health():
@@ -931,9 +972,15 @@ async def upload(
     candidate_name, email, phone = _extract_contact(text, file.filename)
     await asyncio.to_thread(
         _register_resume,
-        resume_id, file.filename, content,
-        file.content_type or "application/octet-stream", flags, content_hash,
-        candidate_name, email, phone,
+        resume_id,
+        file.filename,
+        content,
+        file.content_type or "application/octet-stream",
+        flags,
+        content_hash,
+        candidate_name,
+        email,
+        phone,
     )
     if tag_list:
         await asyncio.to_thread(_set_resume_tags, resume_id, tag_list)
@@ -1026,9 +1073,7 @@ async def resume_file(resume_id: str, download: bool = False):
         content=file_data,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": (
-                f'{disposition}; filename="{ascii_name}"; filename*=UTF-8\'\'{encoded_name}'
-            )
+            "Content-Disposition": (f"{disposition}; filename=\"{ascii_name}\"; filename*=UTF-8''{encoded_name}")
         },
     )
 

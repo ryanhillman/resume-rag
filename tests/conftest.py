@@ -18,5 +18,6 @@ def client():
         patch("app.main._sessions_purge"),
     ):
         from app.main import app
+
         with TestClient(app, headers={"X-API-Key": "test-api-key"}) as c:
             yield c

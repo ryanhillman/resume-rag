@@ -22,6 +22,7 @@ def bare_client():
         patch("app.main._session_valid", side_effect=lambda t: _h(t) in _live_sessions),
     ):
         from app.main import app
+
         with TestClient(app, follow_redirects=False, base_url="https://testserver") as c:
             yield c
 
@@ -29,6 +30,7 @@ def bare_client():
 @pytest.fixture(autouse=True)
 def _reset(bare_client):
     from app.main import _LOGIN_ATTEMPTS
+
     _LOGIN_ATTEMPTS.clear()
     _live_sessions.clear()
     bare_client.cookies.clear()
@@ -36,6 +38,7 @@ def _reset(bare_client):
 
 
 # --- Sign-in ---
+
 
 def test_correct_password_redirects(bare_client):
     resp = bare_client.post("/login", data={"password": "test-password"})
@@ -50,6 +53,7 @@ def test_wrong_password_returns_401(bare_client):
 
 def test_rate_limit_after_max_failures(bare_client):
     from app.main import _LOGIN_MAX_FAILURES
+
     for _ in range(_LOGIN_MAX_FAILURES):
         bare_client.post("/login", data={"password": "wrong"})
     resp = bare_client.post("/login", data={"password": "wrong"})
@@ -61,6 +65,7 @@ def test_lockout_blocks_even_a_correct_password(bare_client):
     honoured while locked out, an attacker's eventual right guess would be let
     through and the lockout would throttle nothing."""
     from app.main import _LOGIN_MAX_FAILURES
+
     for _ in range(_LOGIN_MAX_FAILURES):
         bare_client.post("/login", data={"password": "wrong"})
     resp = bare_client.post("/login", data={"password": "test-password"})
@@ -72,13 +77,16 @@ def test_lockout_not_bypassable_by_spoofing_forwarded_for(bare_client):
     """Caddy appends the real peer to X-Forwarded-For, so only the last entry is
     trustworthy. Rotating the client-supplied prefix must not open a new bucket."""
     from app.main import _LOGIN_MAX_FAILURES
+
     for i in range(_LOGIN_MAX_FAILURES):
         bare_client.post(
-            "/login", data={"password": "wrong"},
+            "/login",
+            data={"password": "wrong"},
             headers={"X-Forwarded-For": f"{i}.{i}.{i}.{i}, 10.0.0.5"},
         )
     resp = bare_client.post(
-        "/login", data={"password": "wrong"},
+        "/login",
+        data={"password": "wrong"},
         headers={"X-Forwarded-For": "9.9.9.9, 10.0.0.5"},
     )
     assert resp.status_code == 429
@@ -87,19 +95,23 @@ def test_lockout_not_bypassable_by_spoofing_forwarded_for(bare_client):
 def test_lockout_is_scoped_to_the_real_client_ip(bare_client):
     """A genuinely different client must not inherit another IP's lockout."""
     from app.main import _LOGIN_MAX_FAILURES
+
     for _ in range(_LOGIN_MAX_FAILURES):
         bare_client.post(
-            "/login", data={"password": "wrong"},
+            "/login",
+            data={"password": "wrong"},
             headers={"X-Forwarded-For": "1.1.1.1, 10.0.0.5"},
         )
     resp = bare_client.post(
-        "/login", data={"password": "wrong"},
+        "/login",
+        data={"password": "wrong"},
         headers={"X-Forwarded-For": "1.1.1.1, 10.0.0.9"},
     )
     assert resp.status_code == 401
 
 
 # --- Sessions ---
+
 
 def test_valid_session_grants_access(bare_client):
     bare_client.post("/login", data={"password": "test-password"})
@@ -119,6 +131,7 @@ def test_invalid_session_token_returns_401(bare_client):
 
 
 # --- CSRF ---
+
 
 def test_csrf_matching_origin_passes(bare_client):
     resp = bare_client.post(

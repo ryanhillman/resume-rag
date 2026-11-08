@@ -37,10 +37,15 @@ def test_update_tags_missing_resume(client):
 
 # --- Contact corrections ---
 
+
 def test_patch_contact_returns_full_row(client):
     row = {
-        "resume_id": "abc", "filename": "r.pdf", "status": "ready",
-        "candidate_name": "Tom Becker", "email": "new@example.com", "phone": None,
+        "resume_id": "abc",
+        "filename": "r.pdf",
+        "status": "ready",
+        "candidate_name": "Tom Becker",
+        "email": "new@example.com",
+        "phone": None,
     }
     with patch("app.main._update_resume_contact", return_value=row) as mock_update:
         res = client.patch("/resumes/abc", json={"email": "new@example.com"})
