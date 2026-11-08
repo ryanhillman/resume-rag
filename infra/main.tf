@@ -215,14 +215,11 @@ resource "azurerm_virtual_machine_data_disk_attachment" "data" {
 }
 
 # ── GitHub Actions deploy identity ────────────────────────────────────────────
-# GitHub exchanges a short-lived OIDC token for Azure credentials, so there is
-# no secret in the repository to leak or rotate. The deploy reaches the VM
-# through the Azure control plane rather than SSH, which is why port 22 can stay
-# closed to everything but the admin address in var.allowed_ssh_cidr.
-#
-# A user-assigned managed identity is used rather than an Entra app
-# registration: the federated credential works identically, but creating one
-# needs no directory-level permissions.
+# GitHub exchanges a short-lived OIDC token for Azure credentials: no secret in
+# the repository, and the deploy reaches the VM through Azure's control plane
+# rather than SSH, so port 22 stays closed to all but var.allowed_ssh_cidr. A
+# managed identity rather than an app registration — the federated credential
+# is identical and needs no directory-level permissions.
 
 data "azurerm_client_config" "current" {}
 
@@ -239,19 +236,17 @@ resource "azurerm_federated_identity_credential" "github_main" {
   audience  = ["api://AzureADTokenExchange"]
   issuer    = "https://token.actions.githubusercontent.com"
 
-  # GitHub signs this exact string into the token's subject claim, so only a
-  # run targeting this repository's deploy environment can assume the identity.
-  # A pull request from a fork cannot: it does not reach that environment.
-  #
-  # The prefix carries GitHub's immutable numeric owner and repository IDs, so
-  # renaming either cannot hand the trust to whoever later claims the old name.
-  subject = "${var.github_oidc_subject_prefix}:environment:${var.github_environment}"
+  # Only a run in this repository's production environment can present this
+  # subject; a fork's pull request never reaches that environment. The numeric
+  # owner and repository IDs are immutable, so renaming either cannot hand the
+  # trust to whoever claims the old name. For another repository, read it with:
+  #   gh api repos/<owner>/<repo>/actions/oidc/customization/sub --jq .sub_claim_prefix
+  subject = "repo:ryanhillman@65861600/resume-rag@1446372536:environment:production"
 }
 
-# Least privilege: the deploy needs to read the VM and manage run commands on
-# it. The built-in Virtual Machine Contributor role would also permit resizing,
-# restarting and deleting the VM. Note there is no delete action here — the
-# workflow reuses one run command name, so each deploy overwrites the last.
+# Least privilege: Virtual Machine Contributor would also permit resizing,
+# restarting and deleting the VM. No delete action here — the workflow reuses
+# one run command name, so each deploy overwrites the last.
 resource "azurerm_role_definition" "run_command" {
   name        = "${var.prefix}-run-command"
   scope       = azurerm_linux_virtual_machine.vm.id
@@ -275,11 +270,9 @@ resource "azurerm_role_assignment" "deploy_run_command" {
   principal_id       = azurerm_user_assigned_identity.deploy.principal_id
 }
 
-# `az vm run-command` resolves the resource group before it reaches the VM, and
-# a role assignment grants nothing above its own scope, so the VM-scoped role
-# above cannot satisfy that lookup. This grants sight of the group itself and no
-# access whatever to the resources inside it, which keeps the deploy identity
-# unable to touch anything but the one VM.
+# `az vm run-command` resolves the resource group first, and a role assignment
+# grants nothing above its own scope, so the VM-scoped role cannot satisfy that
+# lookup. This grants sight of the group and no access to anything within it.
 resource "azurerm_role_definition" "resource_group_read" {
   name        = "${var.prefix}-resource-group-read"
   scope       = azurerm_resource_group.rg.id

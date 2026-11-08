@@ -61,14 +61,3 @@ variable "data_disk_size_gb" {
   type        = number
   default     = 64
 }
-
-variable "github_oidc_subject_prefix" {
-  description = "Immutable subject prefix GitHub Actions presents in its OIDC token, which only this repository can present. Read it with: gh api repos/<owner>/<repo>/actions/oidc/customization/sub --jq .sub_claim_prefix"
-  type        = string
-}
-
-variable "github_environment" {
-  description = "GitHub Actions environment the deploy job runs in. The federated credential trusts this environment and no other."
-  type        = string
-  default     = "production"
-}

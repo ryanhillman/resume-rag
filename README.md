@@ -60,7 +60,6 @@ flowchart TD
 **1. Provision infrastructure**
 ```bash
 cd infra && cp terraform.tfvars.example terraform.tfvars  # fill in values
-gh api repos/<owner>/<repo>/actions/oidc/customization/sub --jq .sub_claim_prefix
 terraform init && terraform apply
 ```
 

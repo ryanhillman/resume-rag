@@ -5,13 +5,12 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# The pipeline only reads the repo; the deploy runs on the VM itself, so no
-# token scope beyond reading the code is required.
+# The deploy runs on the VM itself, so no scope beyond reading the code.
 permissions:
   contents: read
 
-# A single-vCPU VM cannot service two builds at once. Queue them instead, and
-# never cancel a half-finished deploy.
+# A single-vCPU VM cannot build twice at once, and a half-finished deploy must
+# not be cancelled.
 concurrency:
   group: deploy-production
   cancel-in-progress: false
@@ -69,9 +68,8 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
-      # azure/login trades this short-lived OIDC token for Azure credentials.
-      # Nothing long-lived is stored in GitHub, which is why this workflow
-      # references no secrets at all.
+      # azure/login trades this short-lived token for Azure credentials, so
+      # this workflow references no secrets at all.
       id-token: write
     env:
       RESOURCE_GROUP: resume-rag-rg
@@ -91,12 +89,19 @@ jobs:
         env:
           COMMIT: ${{ github.sha }}
         run: |
-          # The VM pulls its own code with a read-only deploy key, so all CI
-          # hands it is the revision to check out. Reusing a single run command
-          # name overwrites the previous deploy rather than accumulating child
-          # resources on the VM.
-          sed "s/__DEPLOY_COMMIT__/${COMMIT}/" scripts/deploy-on-vm.sh > deploy.sh
-          az vm run-command create             --resource-group "$RESOURCE_GROUP"             --vm-name "$VM_NAME"             --name deploy             --script "$(cat deploy.sh)"             --output none
+          # Run Command executes the script with bash whatever its first
+          # line is, so COMMIT goes in front. Asserted, because a failed
+          # prepend would silently deploy the tip of main instead.
+          { echo "COMMIT=$COMMIT"; cat scripts/deploy-on-vm.sh; } > deploy.sh
+          head -n 1 deploy.sh | grep -qxF "COMMIT=$COMMIT"
+
+          # One run command name, so each deploy overwrites the last.
+          az vm run-command create \
+            --resource-group "$RESOURCE_GROUP" \
+            --vm-name "$VM_NAME" \
+            --name deploy \
+            --script "$(cat deploy.sh)" \
+            --output none
 
       - name: Report the deploy result
         run: |
@@ -105,14 +110,13 @@ jobs:
           jq -r '.instanceView.error // ""' view.json >&2
           code=$(jq -r '.instanceView.exitCode' view.json)
           echo "script exit code: $code"
-          # run-command reports success whenever the agent managed to run the
-          # script at all, so the script's own status has to be asserted here.
+          # run-command succeeds if the agent ran the script at all, so the
+          # script's own status has to be asserted here.
           test "$code" = "0"
 
       - name: Verify the app answers
         run: |
-          # The hosted runner reaches the site exactly as a visitor does, so
-          # this also validates the public certificate.
+          # As a visitor would, so this also validates the public certificate.
           for _ in $(seq 1 30); do
             if curl -fsS -o /dev/null "https://${DOMAIN}/"; then
               echo "app is responding"
