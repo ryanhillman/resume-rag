@@ -239,10 +239,13 @@ resource "azurerm_federated_identity_credential" "github_main" {
   audience  = ["api://AzureADTokenExchange"]
   issuer    = "https://token.actions.githubusercontent.com"
 
-  # Scoped to one branch of one repository. A workflow running on any other
-  # ref — a pull request from a fork, for instance — cannot assume this
-  # identity, because GitHub signs the ref into the token's subject claim.
-  subject = "repo:${var.github_repository}:ref:refs/heads/main"
+  # GitHub signs this exact string into the token's subject claim, so only a
+  # run targeting this repository's deploy environment can assume the identity.
+  # A pull request from a fork cannot: it does not reach that environment.
+  #
+  # The prefix carries GitHub's immutable numeric owner and repository IDs, so
+  # renaming either cannot hand the trust to whoever later claims the old name.
+  subject = "${var.github_oidc_subject_prefix}:environment:${var.github_environment}"
 }
 
 # Least privilege: the deploy needs to read the VM and manage run commands on
@@ -269,5 +272,29 @@ resource "azurerm_role_definition" "run_command" {
 resource "azurerm_role_assignment" "deploy_run_command" {
   scope              = azurerm_linux_virtual_machine.vm.id
   role_definition_id = azurerm_role_definition.run_command.role_definition_resource_id
+  principal_id       = azurerm_user_assigned_identity.deploy.principal_id
+}
+
+# `az vm run-command` resolves the resource group before it reaches the VM, and
+# a role assignment grants nothing above its own scope, so the VM-scoped role
+# above cannot satisfy that lookup. This grants sight of the group itself and no
+# access whatever to the resources inside it, which keeps the deploy identity
+# unable to touch anything but the one VM.
+resource "azurerm_role_definition" "resource_group_read" {
+  name        = "${var.prefix}-resource-group-read"
+  scope       = azurerm_resource_group.rg.id
+  description = "Read the ${var.prefix} resource group's existence, and nothing within it."
+
+  permissions {
+    actions     = ["Microsoft.Resources/subscriptions/resourceGroups/read"]
+    not_actions = []
+  }
+
+  assignable_scopes = [azurerm_resource_group.rg.id]
+}
+
+resource "azurerm_role_assignment" "deploy_resource_group_read" {
+  scope              = azurerm_resource_group.rg.id
+  role_definition_id = azurerm_role_definition.resource_group_read.role_definition_resource_id
   principal_id       = azurerm_user_assigned_identity.deploy.principal_id
 }

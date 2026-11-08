@@ -62,7 +62,13 @@ variable "data_disk_size_gb" {
   default     = 64
 }
 
-variable "github_repository" {
-  description = "The owner/name of the GitHub repository allowed to assume the deploy identity. Written into the federated credential's subject claim, so only this repository's main branch can deploy."
+variable "github_oidc_subject_prefix" {
+  description = "Immutable subject prefix GitHub Actions presents in its OIDC token, which only this repository can present. Read it with: gh api repos/<owner>/<repo>/actions/oidc/customization/sub --jq .sub_claim_prefix"
   type        = string
+}
+
+variable "github_environment" {
+  description = "GitHub Actions environment the deploy job runs in. The federated credential trusts this environment and no other."
+  type        = string
+  default     = "production"
 }
