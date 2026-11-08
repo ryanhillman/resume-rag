@@ -16,45 +16,19 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  lint:
-    name: Lint
+  check:
+    name: Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
-      - run: pip install ruff==0.15.2
-      - run: ruff check app/ tests/
-
-  audit:
-    name: Audit dependencies
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.11"
-      - run: pip install pip-audit
-      - run: pip-audit -r requirements.txt
-
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.11"
-      - run: pip install -r requirements.txt pytest httpx fpdf2
-      - run: pytest tests/
-
-  validate-terraform:
-    name: Validate Terraform
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
       - uses: hashicorp/setup-terraform@v4
+      - run: pip install -r requirements.txt pytest httpx fpdf2 ruff==0.15.2 pip-audit
+      - run: ruff check app/ tests/
+      - run: pip-audit -r requirements.txt
+      - run: pytest tests/
       - run: terraform -chdir=infra init -backend=false
       - run: terraform -chdir=infra validate
       - run: terraform -chdir=infra fmt -check
@@ -62,7 +36,7 @@ jobs:
   deploy:
     name: Deploy to VM
     runs-on: ubuntu-latest
-    needs: [lint, audit, test, validate-terraform]
+    needs: [check]
     if: github.ref == 'refs/heads/main'
     environment: production
     timeout-minutes: 20
