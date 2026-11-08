@@ -28,3 +28,22 @@ output "ai_key" {
   value       = azurerm_cognitive_account.ai.primary_access_key
   sensitive   = true
 }
+
+# Set these three as GitHub Actions *variables* (not secrets) on the repository:
+#   gh variable set AZURE_CLIENT_ID --body "$(terraform -chdir=infra output -raw deploy_client_id)"
+# They are identifiers, not credentials: holding them grants nothing without a
+# GitHub OIDC token whose subject matches the federated credential.
+output "deploy_client_id" {
+  description = "Client ID of the managed identity GitHub Actions assumes."
+  value       = azurerm_user_assigned_identity.deploy.client_id
+}
+
+output "deploy_tenant_id" {
+  description = "Entra tenant ID for azure/login."
+  value       = data.azurerm_client_config.current.tenant_id
+}
+
+output "subscription_id" {
+  description = "Subscription ID for azure/login."
+  value       = data.azurerm_client_config.current.subscription_id
+}

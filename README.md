@@ -63,21 +63,32 @@ cd infra && cp terraform.tfvars.example terraform.tfvars  # fill in values
 terraform init && terraform apply
 ```
 
-**2. Configure secrets on the VM**
+**2. Configure the VM's environment**
 
-```bash
-# Add to ~/.env on the VM:
-APP_API_KEY=<generate: python3 -c "import secrets; print(secrets.token_urlsafe(32))">
-UI_PASSWORD=<password for the staff web UI>
-AZURE_EMBED_ENDPOINT=https://<subdomain>.cognitiveservices.azure.com
-AZURE_EMBED_API_KEY=<Azure AI Foundry key>
-RAG_DB=rag
-DOMAIN=<your-hostname-or-http://ip>
-```
+Copy `.env.example` to `~/.env` on the VM and fill in every variable. `DOMAIN`
+must be a fully-qualified hostname: the session cookie is `Secure`, so sign-in
+fails over plain HTTP.
 
 **3. Deploy via CI/CD**
 
-Add GitHub Actions secrets `VM_SSH_KEY` and `VM_HOST`, and variable `VM_USER`. Push to `main` — lint → audit → test → terraform → deploy.
+CI authenticates to Azure with a short-lived OIDC token and asks the VM to
+deploy itself; the VM pulls the tested commit with a read-only deploy key. No
+secrets are stored and nothing connects inbound.
+
+```bash
+cd infra
+gh variable set AZURE_CLIENT_ID       --body "$(terraform output -raw deploy_client_id)"
+gh variable set AZURE_TENANT_ID       --body "$(terraform output -raw deploy_tenant_id)"
+gh variable set AZURE_SUBSCRIPTION_ID --body "$(terraform output -raw subscription_id)"
+
+VM=azureuser@<your-hostname>
+ssh "$VM" 'ssh-keygen -t ed25519 -f ~/.ssh/github-deploy -N ""'
+gh api meta --jq '.ssh_keys[]' | sed 's|^|github.com |' | ssh "$VM" 'cat >> ~/.ssh/known_hosts'
+ssh "$VM" 'cat ~/.ssh/github-deploy.pub' > vm-deploy.pub
+gh repo deploy-key add vm-deploy.pub --title "VM (read-only)"
+```
+
+Push to `main` — lint → audit → test → terraform → deploy.
 
 ---
 

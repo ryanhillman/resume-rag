@@ -213,3 +213,61 @@ resource "azurerm_virtual_machine_data_disk_attachment" "data" {
   lun                = 0
   caching            = "ReadWrite"
 }
+
+# ── GitHub Actions deploy identity ────────────────────────────────────────────
+# GitHub exchanges a short-lived OIDC token for Azure credentials, so there is
+# no secret in the repository to leak or rotate. The deploy reaches the VM
+# through the Azure control plane rather than SSH, which is why port 22 can stay
+# closed to everything but the admin address in var.allowed_ssh_cidr.
+#
+# A user-assigned managed identity is used rather than an Entra app
+# registration: the federated credential works identically, but creating one
+# needs no directory-level permissions.
+
+data "azurerm_client_config" "current" {}
+
+resource "azurerm_user_assigned_identity" "deploy" {
+  name                = "${var.prefix}-deploy"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  tags                = local.tags
+}
+
+resource "azurerm_federated_identity_credential" "github_main" {
+  name      = "github-main"
+  parent_id = azurerm_user_assigned_identity.deploy.id
+  audience  = ["api://AzureADTokenExchange"]
+  issuer    = "https://token.actions.githubusercontent.com"
+
+  # Scoped to one branch of one repository. A workflow running on any other
+  # ref — a pull request from a fork, for instance — cannot assume this
+  # identity, because GitHub signs the ref into the token's subject claim.
+  subject = "repo:${var.github_repository}:ref:refs/heads/main"
+}
+
+# Least privilege: the deploy needs to read the VM and manage run commands on
+# it. The built-in Virtual Machine Contributor role would also permit resizing,
+# restarting and deleting the VM. Note there is no delete action here — the
+# workflow reuses one run command name, so each deploy overwrites the last.
+resource "azurerm_role_definition" "run_command" {
+  name        = "${var.prefix}-run-command"
+  scope       = azurerm_linux_virtual_machine.vm.id
+  description = "Manage run commands on the ${var.prefix} VM, and nothing else."
+
+  permissions {
+    actions = [
+      "Microsoft.Compute/virtualMachines/read",
+      "Microsoft.Compute/virtualMachines/runCommands/read",
+      "Microsoft.Compute/virtualMachines/runCommands/write",
+    ]
+    not_actions = []
+  }
+
+  assignable_scopes = [azurerm_linux_virtual_machine.vm.id]
+}
+
+resource "azurerm_role_assignment" "deploy_run_command" {
+  scope              = azurerm_linux_virtual_machine.vm.id
+  role_definition_id = azurerm_role_definition.run_command.role_definition_resource_id
+  principal_id       = azurerm_user_assigned_identity.deploy.principal_id
+}

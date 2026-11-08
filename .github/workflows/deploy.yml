@@ -62,56 +62,63 @@ jobs:
 
   deploy:
     name: Deploy to VM
-    # Runs on the self-hosted runner installed on the VM. The runner polls
-    # GitHub over outbound HTTPS, so port 22 does not need to accept
-    # connections from GitHub's hosted-runner IP ranges.
-    runs-on: [self-hosted, linux, resume-rag]
+    runs-on: ubuntu-latest
     needs: [lint, audit, test, validate-terraform]
     if: github.ref == 'refs/heads/main'
     environment: production
     timeout-minutes: 20
+    permissions:
+      contents: read
+      # azure/login trades this short-lived OIDC token for Azure credentials.
+      # Nothing long-lived is stored in GitHub, which is why this workflow
+      # references no secrets at all.
+      id-token: write
     env:
-      # Pins the compose project to the one that already owns the live volumes.
-      # Left unset, the project name comes from the working directory, which on
-      # a runner is the checkout path, so compose creates a new empty pgdata
-      # volume and the app serves an empty database.
-      COMPOSE_PROJECT_NAME: azureuser
+      RESOURCE_GROUP: resume-rag-rg
+      VM_NAME: resume-rag-vm
+      DOMAIN: resume-rag.eastus.cloudapp.azure.com
     steps:
       - uses: actions/checkout@v7
 
-      - name: Sync code into place
-        run: |
-          rsync -a --delete \
-            --exclude='.env' \
-            --exclude='__pycache__/' \
-            app/ "$HOME/app/"
-          install -m 644 Dockerfile .dockerignore docker-compose.yml \
-            requirements.txt Caddyfile "$HOME/"
+      - name: Authenticate to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Rebuild containers
+      - name: Deploy this commit on the VM
+        env:
+          COMMIT: ${{ github.sha }}
         run: |
-          docker compose \
-            -f "$HOME/docker-compose.yml" \
-            --env-file "$HOME/.env" \
-            up -d --build --remove-orphans
+          # The VM pulls its own code with a read-only deploy key, so all CI
+          # hands it is the revision to check out. Reusing a single run command
+          # name overwrites the previous deploy rather than accumulating child
+          # resources on the VM.
+          sed "s/__DEPLOY_COMMIT__/${COMMIT}/" scripts/deploy-on-vm.sh > deploy.sh
+          az vm run-command create             --resource-group "$RESOURCE_GROUP"             --vm-name "$VM_NAME"             --name deploy             --script "$(cat deploy.sh)"             --output none
+
+      - name: Report the deploy result
+        run: |
+          az vm run-command show             --resource-group "$RESOURCE_GROUP" --vm-name "$VM_NAME"             --name deploy --instance-view -o json > view.json
+          jq -r '.instanceView.output // ""' view.json
+          jq -r '.instanceView.error // ""' view.json >&2
+          code=$(jq -r '.instanceView.exitCode' view.json)
+          echo "script exit code: $code"
+          # run-command reports success whenever the agent managed to run the
+          # script at all, so the script's own status has to be asserted here.
+          test "$code" = "0"
 
       - name: Verify the app answers
         run: |
-          docker compose -f "$HOME/docker-compose.yml" ps
-          # Only caddy publishes ports, so probe it rather than the app's
-          # unpublished 8000. --resolve keeps the connection local while still
-          # sending the real hostname as SNI; a Host header alone fails, because
-          # caddy holds no certificate for 127.0.0.1 and aborts the handshake
-          # before reading any header. -k tolerates a renewal window serving an
-          # internal cert, which is not the app being down.
-          domain=$(grep '^DOMAIN=' "$HOME/.env" | cut -d= -f2- | tr -d '\r')
+          # The hosted runner reaches the site exactly as a visitor does, so
+          # this also validates the public certificate.
           for _ in $(seq 1 30); do
-            if curl -fsS -o /dev/null -k --resolve "${domain}:443:127.0.0.1" "https://${domain}/"; then
+            if curl -fsS -o /dev/null "https://${DOMAIN}/"; then
               echo "app is responding"
               exit 0
             fi
             sleep 4
           done
           echo "app did not respond within 120s"
-          docker compose -f "$HOME/docker-compose.yml" logs --tail=50
           exit 1

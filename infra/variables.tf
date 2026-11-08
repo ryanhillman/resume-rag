@@ -61,3 +61,8 @@ variable "data_disk_size_gb" {
   type        = number
   default     = 64
 }
+
+variable "github_repository" {
+  description = "The owner/name of the GitHub repository allowed to assume the deploy identity. Written into the federated credential's subject claim, so only this repository's main branch can deploy."
+  type        = string
+}
