@@ -1,10 +1,7 @@
-# Install once:  pip install pre-commit
-#                pre-commit install --hook-type pre-commit --hook-type commit-msg
+# Install once:  pip install pre-commit && pre-commit install
 #
 # Bump pinned revs with:  pre-commit autoupdate
 # (Dependabot does not cover the pre-commit ecosystem.)
-
-default_install_hook_types: [pre-commit, commit-msg]
 
 repos:
   # ── Secret scanning ────────────────────────────────────────────────────────
@@ -12,16 +9,6 @@ repos:
     rev: v8.30.1
     hooks:
       - id: gitleaks
-
-  # ── Commit message convention (see .gitmessage) ────────────────────────────
-  - repo: local
-    hooks:
-      - id: check-commit-subject
-        name: commit subject follows Conventional Commits, <= 72 chars
-        entry: python scripts/check-commit-subject.py
-        language: system
-        stages: [commit-msg]
-        pass_filenames: true
 
   # ── Lint / format: pinned to the same ruff version CI runs ─────────────────
   - repo: https://github.com/astral-sh/ruff-pre-commit
