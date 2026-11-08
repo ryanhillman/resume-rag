@@ -1,0 +1,18 @@
+# Normalize every text file to LF inside the repository, and check it out as
+# LF on all platforms. This project is built and deployed on Linux (Docker,
+# Caddy, cloud-init), where CRLF in a shell script or Dockerfile breaks at
+# runtime rather than at commit time.
+* text=auto eol=lf
+
+# Binary: never normalize, never diff as text.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.woff  binary
+*.woff2 binary
+
+# Generated / vendored: collapse in diffs and exclude from language stats.
+infra/.terraform.lock.hcl linguist-generated=true

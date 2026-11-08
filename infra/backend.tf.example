@@ -1,0 +1,20 @@
+# Remote state backend — keeps terraform.tfstate in Azure Blob Storage instead
+# of on your local machine. Required if you run terraform from multiple machines
+# or want state backed up.
+#
+# One-time setup (run before terraform init):
+#   az group create -n tfstate-rg -l eastus
+#   az storage account create -n <unique_name> -g tfstate-rg --sku Standard_LRS --allow-blob-public-access false
+#   az storage container create -n tfstate --account-name <unique_name>
+#
+# Then copy this file to backend.tf, fill in the values, and run:
+#   terraform init -reconfigure
+
+terraform {
+  backend "azurerm" {
+    resource_group_name  = "tfstate-rg"
+    storage_account_name = "<your_storage_account_name>"
+    container_name       = "tfstate"
+    key                  = "resume-rag.tfstate"
+  }
+}

@@ -1,0 +1,117 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# The pipeline only reads the repo; the deploy runs on the VM itself, so no
+# token scope beyond reading the code is required.
+permissions:
+  contents: read
+
+# A single-vCPU VM cannot service two builds at once. Queue them instead, and
+# never cancel a half-finished deploy.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - run: pip install ruff==0.15.2
+      - run: ruff check app/ tests/
+
+  audit:
+    name: Audit dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - run: pip install pip-audit
+      - run: pip-audit -r requirements.txt
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt pytest httpx fpdf2
+      - run: pytest tests/
+
+  validate-terraform:
+    name: Validate Terraform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
+      - run: terraform -chdir=infra init -backend=false
+      - run: terraform -chdir=infra validate
+      - run: terraform -chdir=infra fmt -check
+
+  deploy:
+    name: Deploy to VM
+    # Runs on the self-hosted runner installed on the VM. The runner polls
+    # GitHub over outbound HTTPS, so port 22 does not need to accept
+    # connections from GitHub's hosted-runner IP ranges.
+    runs-on: [self-hosted, linux, resume-rag]
+    needs: [lint, audit, test, validate-terraform]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    timeout-minutes: 20
+    env:
+      # Pins the compose project to the one that already owns the live volumes.
+      # Left unset, the project name comes from the working directory, which on
+      # a runner is the checkout path, so compose creates a new empty pgdata
+      # volume and the app serves an empty database.
+      COMPOSE_PROJECT_NAME: azureuser
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Sync code into place
+        run: |
+          rsync -a --delete \
+            --exclude='.env' \
+            --exclude='__pycache__/' \
+            app/ "$HOME/app/"
+          install -m 644 Dockerfile .dockerignore docker-compose.yml \
+            requirements.txt Caddyfile "$HOME/"
+
+      - name: Rebuild containers
+        run: |
+          docker compose \
+            -f "$HOME/docker-compose.yml" \
+            --env-file "$HOME/.env" \
+            up -d --build --remove-orphans
+
+      - name: Verify the app answers
+        run: |
+          docker compose -f "$HOME/docker-compose.yml" ps
+          # Only caddy publishes ports, so probe it rather than the app's
+          # unpublished 8000. --resolve keeps the connection local while still
+          # sending the real hostname as SNI; a Host header alone fails, because
+          # caddy holds no certificate for 127.0.0.1 and aborts the handshake
+          # before reading any header. -k tolerates a renewal window serving an
+          # internal cert, which is not the app being down.
+          domain=$(grep '^DOMAIN=' "$HOME/.env" | cut -d= -f2- | tr -d '\r')
+          for _ in $(seq 1 30); do
+            if curl -fsS -o /dev/null -k --resolve "${domain}:443:127.0.0.1" "https://${domain}/"; then
+              echo "app is responding"
+              exit 0
+            fi
+            sleep 4
+          done
+          echo "app did not respond within 120s"
+          docker compose -f "$HOME/docker-compose.yml" logs --tail=50
+          exit 1

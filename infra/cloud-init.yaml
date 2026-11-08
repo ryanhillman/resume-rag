@@ -1,0 +1,34 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+
+packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gnupg
+  - rsync
+
+runcmd:
+  # Docker CE
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  - chmod a+r /etc/apt/keyrings/docker.gpg
+  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
+  - apt-get update -y
+  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  - systemctl enable docker
+  - systemctl start docker
+  - usermod -aG docker ${admin_username}
+
+# Format and mount the data disk that holds the Postgres volume. overwrite is
+# false so an existing filesystem is never destroyed on a reboot or rebuild;
+# nofail keeps the VM bootable if the disk is ever detached.
+fs_setup:
+  - device: /dev/disk/azure/scsi1/lun0
+    filesystem: ext4
+    partition: none
+    overwrite: false
+
+mounts:
+  - [/dev/disk/azure/scsi1/lun0, /data, ext4, "defaults,nofail", "0", "2"]
