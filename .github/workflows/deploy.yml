@@ -87,25 +87,47 @@ jobs:
 
       - name: Deploy this commit on the VM
         env:
-          COMMIT: ${{ github.sha }}
-        run: |
-          # Run Command executes the script with bash whatever its first
-          # line is, so COMMIT goes in front. Asserted, because a failed
-          # prepend would silently deploy the tip of main instead.
-          { echo "COMMIT=$COMMIT"; cat scripts/deploy-on-vm.sh; } > deploy.sh
-          head -n 1 deploy.sh | grep -qxF "COMMIT=$COMMIT"
+          SCRIPT: |
+            set -euo pipefail
 
-          # One run command name, so each deploy overwrites the last.
+            # Azure runs this as root, and git refuses to work in a checkout
+            # owned by another user, hence a root-owned one. The deploy key and
+            # known_hosts stay with the admin user.
+            export GIT_SSH_COMMAND="ssh -i /home/azureuser/.ssh/github-deploy -o IdentitiesOnly=yes -o UserKnownHostsFile=/home/azureuser/.ssh/known_hosts -o StrictHostKeyChecking=yes"
+
+            [ -d /opt/resume-rag/.git ] ||
+              git clone --depth 1 git@github.com:ryanhillman/resume-rag.git /opt/resume-rag
+            cd /opt/resume-rag
+            git fetch --depth 1 origin ${{ github.sha }}
+            git reset --hard FETCH_HEAD
+            git clean -fd
+
+            # Unset, compose names the project after the directory and would
+            # build empty volumes, losing Caddy's certificate.
+            export COMPOSE_PROJECT_NAME=azureuser
+
+            # .env holds the secrets and sits outside the checkout, beyond
+            # git's reach. Quiet because Run Command returns only the last few
+            # KB of output; the public fetch below is what decides success.
+            docker compose --progress quiet --env-file /home/azureuser/.env up -d --build --remove-orphans
+            docker image prune -f >/dev/null
+        run: |
+          # "$SCRIPT" expands once, so the $ references within it are read on
+          # the VM. One run command name, so each deploy overwrites the last.
           az vm run-command create \
             --resource-group "$RESOURCE_GROUP" \
             --vm-name "$VM_NAME" \
             --name deploy \
-            --script "$(cat deploy.sh)" \
+            --script "$SCRIPT" \
             --output none
 
       - name: Report the deploy result
         run: |
-          az vm run-command show             --resource-group "$RESOURCE_GROUP" --vm-name "$VM_NAME"             --name deploy --instance-view -o json > view.json
+          az vm run-command show \
+            --resource-group "$RESOURCE_GROUP" \
+            --vm-name "$VM_NAME" \
+            --name deploy \
+            --instance-view -o json > view.json
           jq -r '.instanceView.output // ""' view.json
           jq -r '.instanceView.error // ""' view.json >&2
           code=$(jq -r '.instanceView.exitCode' view.json)
