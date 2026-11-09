@@ -74,7 +74,7 @@ resource "azurerm_network_security_group" "nsg" {
   }
 
   security_rule {
-    name                       = "HTTPS"
+    name                       = "Web"
     priority                   = 120
     direction                  = "Inbound"
     access                     = "Allow"
@@ -146,6 +146,7 @@ resource "azurerm_cognitive_deployment" "llm" {
     capacity = 20
   }
 
+  # Azure rejects concurrent deployments on one account.
   depends_on = [azurerm_cognitive_deployment.embed]
 }
 
@@ -191,11 +192,8 @@ resource "azurerm_linux_virtual_machine" "vm" {
 }
 
 # ── GitHub Actions deploy identity ────────────────────────────────────────────
-# GitHub exchanges a short-lived OIDC token for Azure credentials: no secret in
-# the repository, and the deploy reaches the VM through Azure's control plane
-# rather than SSH, so port 22 stays closed to all but var.allowed_ssh_cidr. A
-# managed identity rather than an app registration — the federated credential
-# is identical and needs no directory-level permissions.
+# OIDC, so no secret is stored, and the deploy reaches the VM through Azure's
+# control plane rather than SSH. A managed identity needs no directory rights.
 
 data "azurerm_client_config" "current" {}
 
@@ -212,29 +210,22 @@ resource "azurerm_federated_identity_credential" "github_main" {
   audience  = ["api://AzureADTokenExchange"]
   issuer    = "https://token.actions.githubusercontent.com"
 
-  # Only a run in this repository's production environment can present this
-  # subject; a fork's pull request never reaches that environment. The numeric
-  # owner and repository IDs are immutable, so renaming either cannot hand the
-  # trust to whoever claims the old name. For another repository, read it with:
+  # Only this repository's production environment can present this subject, and
+  # the numeric IDs are immutable, so a rename cannot transfer the trust.
   #   gh api repos/<owner>/<repo>/actions/oidc/customization/sub --jq .sub_claim_prefix
   subject = "repo:ryanhillman@65861600/resume-rag@1446372536:environment:production"
 }
 
-# Built-in roles, kept least-privilege by scope: Azure ships no role for run
-# commands alone, and of the built-ins that grant them, Virtual Machine
-# Contributor is the narrowest that is actually about virtual machines. Granting
-# it here covers this one VM, not the resource group, so the identity can reach
-# nothing else — though on this VM it also permits restart, resize and delete.
+# Run Command on this VM only; no built-in role is narrower, and it also allows
+# restart, resize and delete.
 resource "azurerm_role_assignment" "deploy_run_command" {
   scope                = azurerm_linux_virtual_machine.vm.id
   role_definition_name = "Virtual Machine Contributor"
   principal_id         = azurerm_user_assigned_identity.deploy.principal_id
 }
 
-# `az vm run-command` resolves the resource group first, and a role assignment
-# grants nothing above its own scope, so the VM-scoped role cannot satisfy that
-# lookup. Reader is the narrowest built-in that can, and it is read-only:
-# reading the AI account's keys is an action, not a read, so this cannot.
+# Run Command resolves the group first, and an assignment grants nothing above
+# its scope. Reader is read-only: listing keys is an action, not a read.
 resource "azurerm_role_assignment" "deploy_resource_group_read" {
   scope                = azurerm_resource_group.rg.id
   role_definition_name = "Reader"
