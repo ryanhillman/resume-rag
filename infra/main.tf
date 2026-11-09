@@ -220,50 +220,23 @@ resource "azurerm_federated_identity_credential" "github_main" {
   subject = "repo:ryanhillman@65861600/resume-rag@1446372536:environment:production"
 }
 
-# Least privilege: Virtual Machine Contributor would also permit resizing,
-# restarting and deleting the VM. No delete action here — the workflow reuses
-# one run command name, so each deploy overwrites the last.
-resource "azurerm_role_definition" "run_command" {
-  name        = "${var.prefix}-run-command"
-  scope       = azurerm_linux_virtual_machine.vm.id
-  description = "Manage run commands on the ${var.prefix} VM, and nothing else."
-
-  permissions {
-    actions = [
-      "Microsoft.Compute/virtualMachines/read",
-      "Microsoft.Compute/virtualMachines/runCommands/read",
-      "Microsoft.Compute/virtualMachines/runCommands/write",
-    ]
-    not_actions = []
-  }
-
-  assignable_scopes = [azurerm_linux_virtual_machine.vm.id]
-}
-
+# Built-in roles, kept least-privilege by scope: Azure ships no role for run
+# commands alone, and of the built-ins that grant them, Virtual Machine
+# Contributor is the narrowest that is actually about virtual machines. Granting
+# it here covers this one VM, not the resource group, so the identity can reach
+# nothing else — though on this VM it also permits restart, resize and delete.
 resource "azurerm_role_assignment" "deploy_run_command" {
-  scope              = azurerm_linux_virtual_machine.vm.id
-  role_definition_id = azurerm_role_definition.run_command.role_definition_resource_id
-  principal_id       = azurerm_user_assigned_identity.deploy.principal_id
+  scope                = azurerm_linux_virtual_machine.vm.id
+  role_definition_name = "Virtual Machine Contributor"
+  principal_id         = azurerm_user_assigned_identity.deploy.principal_id
 }
 
 # `az vm run-command` resolves the resource group first, and a role assignment
 # grants nothing above its own scope, so the VM-scoped role cannot satisfy that
-# lookup. This grants sight of the group and no access to anything within it.
-resource "azurerm_role_definition" "resource_group_read" {
-  name        = "${var.prefix}-resource-group-read"
-  scope       = azurerm_resource_group.rg.id
-  description = "Read the ${var.prefix} resource group's existence, and nothing within it."
-
-  permissions {
-    actions     = ["Microsoft.Resources/subscriptions/resourceGroups/read"]
-    not_actions = []
-  }
-
-  assignable_scopes = [azurerm_resource_group.rg.id]
-}
-
+# lookup. Reader is the narrowest built-in that can, and it is read-only:
+# reading the AI account's keys is an action, not a read, so this cannot.
 resource "azurerm_role_assignment" "deploy_resource_group_read" {
-  scope              = azurerm_resource_group.rg.id
-  role_definition_id = azurerm_role_definition.resource_group_read.role_definition_resource_id
-  principal_id       = azurerm_user_assigned_identity.deploy.principal_id
+  scope                = azurerm_resource_group.rg.id
+  role_definition_name = "Reader"
+  principal_id         = azurerm_user_assigned_identity.deploy.principal_id
 }
