@@ -1,4 +1,4 @@
-# Remote state in Azure Blob Storage. Created 2026-11-07.
+# Remote state in Azure Blob Storage.
 #
 # The storage account has blob versioning and 30-day soft delete enabled, so a
 # corrupted or truncated state file can be rolled back. Authentication uses

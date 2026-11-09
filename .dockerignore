@@ -1,8 +1,6 @@
 .git/
 .github/
 infra/
-flows/
-scripts/
 .env
 .env.*
 __pycache__/
