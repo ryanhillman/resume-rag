@@ -45,6 +45,7 @@ azure.json
 *.tfstate
 *.tfstate.backup
 *.tfplan
+tfplan
 infra/terraform.tfvars
 
 
