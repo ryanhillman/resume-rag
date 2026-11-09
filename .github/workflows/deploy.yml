@@ -25,8 +25,9 @@ jobs:
         with:
           python-version: "3.11"
       - uses: hashicorp/setup-terraform@v4
-      - run: pip install -r requirements.txt pytest httpx fpdf2 ruff==0.15.2 pip-audit
+      - run: pip install -r requirements.txt -r requirements-dev.txt
       - run: ruff check app/ tests/
+      - run: ruff format --check app tests
       - run: pip-audit -r requirements.txt
       - run: pytest tests/
       - run: terraform -chdir=infra init -backend=false

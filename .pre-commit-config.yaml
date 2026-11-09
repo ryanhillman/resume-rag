@@ -7,7 +7,7 @@ repos:
     hooks:
       - id: gitleaks
 
-  # ── Lint / format: pinned to the same ruff version CI runs ─────────────────
+  # ── Lint / format: keep this rev in step with requirements-dev.txt ─────────
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.2
     hooks:
