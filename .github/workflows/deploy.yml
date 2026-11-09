@@ -1,0 +1,116 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# The deploy runs on the VM itself, so no scope beyond reading the code.
+permissions:
+  contents: read
+
+# A single-vCPU VM cannot build twice at once, and a half-finished deploy must
+# not be cancelled.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - uses: hashicorp/setup-terraform@v4
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: ruff check app/ tests/
+      - run: ruff format --check app tests
+      - run: pip-audit -r requirements.txt
+      - run: pytest tests/
+      - run: terraform -chdir=infra init -backend=false
+      - run: terraform -chdir=infra validate
+      - run: terraform -chdir=infra fmt -check
+
+  deploy:
+    name: Deploy to VM
+    runs-on: ubuntu-latest
+    needs: [check]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    timeout-minutes: 20
+    permissions:
+      # No checkout here, so no contents scope. azure/login trades this
+      # short-lived token for Azure credentials, which is why this workflow
+      # references no secrets at all.
+      id-token: write
+    env:
+      RESOURCE_GROUP: resume-rag-rg
+      VM_NAME: resume-rag-vm
+    steps:
+      - name: Authenticate to Azure
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy this commit on the VM
+        env:
+          SCRIPT: |
+            set -euo pipefail
+
+            # Azure runs this as root, and git refuses to work in a checkout
+            # owned by another user, hence a root-owned one.
+            [ -d /opt/resume-rag/.git ] ||
+              git clone --depth 1 https://github.com/ryanhillman/resume-rag.git /opt/resume-rag
+            cd /opt/resume-rag
+            git fetch --depth 1 origin ${{ github.sha }}
+            git reset --hard FETCH_HEAD
+            git clean -fd
+
+            # .env holds the secrets and sits outside the checkout, beyond
+            # git's reach. Quiet because Run Command returns only the last few
+            # KB, which the check and failure logs below must fit inside.
+            docker compose --progress quiet --env-file /home/azureuser/.env up -d --build --remove-orphans
+            docker image prune -f >/dev/null
+
+            # From the VM, so no dependency on allowed_app_cidr. --resolve stays
+            # local but sends the real hostname, so the real cert is verified.
+            domain=$(grep -m1 '^DOMAIN=' /home/azureuser/.env | cut -d= -f2- | tr -d '\r')
+            for _ in $(seq 1 30); do
+              if curl -fsS -o /dev/null --resolve "$domain:443:127.0.0.1" "https://$domain/"; then
+                echo "app is responding at $domain"
+                exit 0
+              fi
+              sleep 4
+            done
+            echo "no response from $domain within 120s"
+            docker compose --env-file /home/azureuser/.env logs --tail=30
+            exit 1
+        run: |
+          # "$SCRIPT" expands once, so the $ references within it are read on
+          # the VM. One run command name, so each deploy overwrites the last.
+          az vm run-command create \
+            --resource-group "$RESOURCE_GROUP" \
+            --vm-name "$VM_NAME" \
+            --name deploy \
+            --script "$SCRIPT" \
+            --output none
+
+      - name: Report the deploy result
+        run: |
+          az vm run-command show \
+            --resource-group "$RESOURCE_GROUP" \
+            --vm-name "$VM_NAME" \
+            --name deploy \
+            --instance-view -o json > view.json
+          jq -r '.instanceView.output // ""' view.json
+          jq -r '.instanceView.error // ""' view.json >&2
+          code=$(jq -r '.instanceView.exitCode' view.json)
+          echo "script exit code: $code"
+          # run-command succeeds if the agent ran the script at all, so the
+          # script's own status, health check included, is asserted here.
+          test "$code" = "0"
