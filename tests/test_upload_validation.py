@@ -13,12 +13,6 @@ def _pdf(pages: int = 1, text: str = "") -> bytes:
     return bytes(pdf.output())
 
 
-def _blank_pdf() -> bytes:
-    pdf = FPDF()
-    pdf.add_page()
-    return bytes(pdf.output())
-
-
 def test_rejects_non_pdf(client):
     resp = client.post(
         "/upload",
@@ -52,7 +46,7 @@ def test_rejects_multi_page_pdf(client):
 def test_rejects_scanned_pdf(client):
     resp = client.post(
         "/upload",
-        files={"file": ("resume.pdf", _blank_pdf(), "application/pdf")},
+        files={"file": ("resume.pdf", _pdf(), "application/pdf")},
     )
     assert resp.status_code == 400
     assert "text" in resp.json()["detail"].lower()
@@ -89,19 +83,17 @@ def test_rejects_duplicate_upload(client):
 
 
 def test_retry_failed_resume(client):
-    resume = {"resume_id": "abc", "filename": "r.pdf", "status": "failed", "candidate_name": "Rae Park"}
+    resume = {"resume_id": "abc", "filename": "r.pdf", "status": "failed"}
     with (
         patch("app.main._get_resume", return_value=resume),
         patch("app.main._claim_failed_resume", return_value=True) as mock_claim,
-        patch("app.main._get_resume_file", return_value=b"%PDF"),
+        patch("app.main._get_resume_file", return_value=(b"%PDF", "r.pdf")),
         patch("app.main._retry_ingest") as mock_retry,
     ):
         resp = client.post("/resumes/abc/retry")
     assert resp.status_code == 200
     assert resp.json()["status"] == "ingesting"
     mock_claim.assert_called_once_with("abc")
-    # The candidate name is not passed through ingest; it is read from resumes
-    # at query time so a correction reaches the model.
     mock_retry.assert_called_once_with("abc", "r.pdf", b"%PDF")
 
 
@@ -149,8 +141,7 @@ def test_extract_contact_falls_back_to_filename():
 
 def test_resume_file_inline_by_default(client):
     with (
-        patch("app.main._get_resume_file", return_value=b"%PDF-1.4"),
-        patch("app.main._get_resume", return_value={"resume_id": "abc", "filename": "r.pdf", "status": "ready"}),
+        patch("app.main._get_resume_file", return_value=(b"%PDF-1.4", "r.pdf")),
     ):
         resp = client.get("/resumes/abc/file")
     assert resp.status_code == 200
@@ -159,8 +150,7 @@ def test_resume_file_inline_by_default(client):
 
 def test_resume_file_attachment_on_download(client):
     with (
-        patch("app.main._get_resume_file", return_value=b"%PDF-1.4"),
-        patch("app.main._get_resume", return_value={"resume_id": "abc", "filename": "r.pdf", "status": "ready"}),
+        patch("app.main._get_resume_file", return_value=(b"%PDF-1.4", "r.pdf")),
     ):
         resp = client.get("/resumes/abc/file?download=true")
     assert resp.headers["content-disposition"].startswith("attachment;")

@@ -196,36 +196,32 @@ def _is_white(color) -> bool:
 def extract_visible_text(pdf_bytes: bytes) -> tuple[str, list[str], int]:
     """Extract visible text, stripping hidden-text injection attempts."""
     flags: list[str] = []
-    pages: list[str] = []
     with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
         page_count = len(pdf.pages)
-        if page_count > 1:
+        if page_count != 1:
             return "", [], page_count
-        for page in pdf.pages:
+        page = pdf.pages[0]
 
-            def _visible(obj, _p=page):
-                if obj.get("object_type") != "char":
-                    return True
-                return not (
-                    _is_white(obj.get("non_stroking_color"))
-                    or (obj.get("size") or 10) < 4
-                    or obj["x1"] < 0
-                    or obj["x0"] > _p.width
-                    or obj["bottom"] < 0
-                    or obj["top"] > _p.height
-                )
+        def _visible(obj):
+            if obj.get("object_type") != "char":
+                return True
+            return not (
+                _is_white(obj.get("non_stroking_color"))
+                or (obj.get("size") or 10) < 4
+                or obj["x1"] < 0
+                or obj["x0"] > page.width
+                or obj["bottom"] < 0
+                or obj["top"] > page.height
+            )
 
-            raw = page.extract_text() or ""
-            vis = page.filter(_visible).extract_text() or ""
-            if len(raw) - len(vis) > 20:
-                flags.append("hidden_text")
-            pages.append(vis)
+        raw = page.extract_text() or ""
+        vis = page.filter(_visible).extract_text() or ""
+        if len(raw) - len(vis) > 20:
+            flags.append("hidden_text")
+        text = vis.strip()
 
-    text = "\n".join(pages).strip()
     if SUSPICIOUS.search(text):
         flags.append("instruction_like_text")
-    seen: set[str] = set()
-    flags = [f for f in flags if not (f in seen or seen.add(f))]  # type: ignore[func-returns-value]
     return text, flags, page_count
 
 
@@ -328,14 +324,15 @@ def _register_resume(
     candidate_name: str,
     email: Optional[str],
     phone: Optional[str],
+    tags: list[str],
 ):
     with _pg() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "INSERT INTO resumes"
                 " (resume_id, filename, file_data, flags, content_hash,"
-                "  candidate_name, email, phone)"
-                " VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                "  candidate_name, email, phone, tags)"
+                " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
                 (
                     resume_id,
                     filename,
@@ -345,6 +342,7 @@ def _register_resume(
                     candidate_name,
                     email,
                     phone,
+                    tags,
                 ),
             )
 
@@ -415,18 +413,21 @@ def _get_resume(resume_id: str) -> Optional[dict]:
             return dict(row) if row else None
 
 
-def _get_resume_file(resume_id: str) -> Optional[bytes]:
+def _get_resume_file(resume_id: str) -> Optional[tuple[bytes, str]]:
     with _pg() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT file_data FROM resumes WHERE resume_id = %s", (resume_id,))
+            cur.execute("SELECT file_data, filename FROM resumes WHERE resume_id = %s", (resume_id,))
             row = cur.fetchone()
-            return bytes(row[0]) if row else None
+            return (bytes(row[0]), row[1]) if row else None
 
 
-def _delete_resume(resume_id: str):
+def _delete_resume(resume_id: str) -> bool:
+    """True if a row was deleted. resume_chunks is ON DELETE CASCADE, so the
+    chunks go with it."""
     with _pg() as conn:
         with conn.cursor() as cur:
-            cur.execute("DELETE FROM resumes WHERE resume_id = %s", (resume_id,))
+            cur.execute("DELETE FROM resumes WHERE resume_id = %s RETURNING resume_id", (resume_id,))
+            return cur.fetchone() is not None
 
 
 def _set_resume_tags(resume_id: str, tags: list[str]):
@@ -489,7 +490,7 @@ _PHONE_RE = re.compile(r"\+?\d{0,2}[\s.()-]{0,2}\d{3}[\s.()-]{0,2}\d{3}[\s.-]?\d
 
 
 def _extract_contact(text: str, filename: str) -> tuple[str, Optional[str], Optional[str]]:
-    """Name, email, phone by regex — no model call. Name falls back to the
+    """Name, email, phone by regex. Name falls back to the
     filename; staff can correct all three via PATCH /resumes/{id}."""
     name = ""
     for line in text.splitlines()[:10]:
@@ -769,7 +770,7 @@ async def _csrf_check(request: Request, call_next):
     return await call_next(request)
 
 
-# ── Helpers ────────────────────────────────────────────────────────────────────
+# ── Ingest ─────────────────────────────────────────────────────────────────────
 
 
 class ChatRequest(BaseModel):
@@ -911,9 +912,8 @@ def upload(
         candidate_name,
         email,
         phone,
+        tag_list,
     )
-    if tag_list:
-        _set_resume_tags(resume_id, tag_list)
     background_tasks.add_task(_ingest, resume_id, file.filename, text)
     return {"resume_id": resume_id, "filename": file.filename, "status": "ingesting"}
 
@@ -925,7 +925,7 @@ def retry_resume(resume_id: str, background_tasks: BackgroundTasks):
         raise HTTPException(status_code=404, detail="resume_id not found")
     if not _claim_failed_resume(resume_id):
         raise HTTPException(status_code=409, detail="Only failed resumes can be retried.")
-    file_data = _get_resume_file(resume_id)
+    file_data, _ = _get_resume_file(resume_id)
     background_tasks.add_task(_retry_ingest, resume_id, resume["filename"], file_data)
     return {"resume_id": resume_id, "filename": resume["filename"], "status": "ingesting"}
 
@@ -995,11 +995,10 @@ def get_resume(resume_id: str):
 @app.get("/resumes/{resume_id}/file", dependencies=[Depends(require_api_key)])
 def resume_file(resume_id: str, download: bool = False):
     """Serve the original PDF inline for viewing; ?download=true to save."""
-    file_data = _get_resume_file(resume_id)
-    if file_data is None:
+    row = _get_resume_file(resume_id)
+    if row is None:
         raise HTTPException(status_code=404, detail="resume_id not found")
-    resume = _get_resume(resume_id)
-    filename = resume["filename"] if resume else "resume"
+    file_data, filename = row
     ascii_name = filename.encode("ascii", errors="replace").decode("ascii")
     encoded_name = quote(filename, encoding="utf-8")
     disposition = "attachment" if download else "inline"
@@ -1068,9 +1067,6 @@ def update_contact(resume_id: str, req: ContactRequest):
 
 @app.delete("/resumes/{resume_id}", dependencies=[Depends(require_api_key)])
 def delete_resume(resume_id: str):
-    resume = _get_resume(resume_id)
-    if not resume:
+    if not _delete_resume(resume_id):
         raise HTTPException(status_code=404, detail="resume_id not found")
-    # resume_chunks is ON DELETE CASCADE, so the chunks go with the row.
-    _delete_resume(resume_id)
     return {"deleted": resume_id}
