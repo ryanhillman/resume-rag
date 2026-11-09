@@ -43,7 +43,7 @@ flowchart TD
     App -- "2 · INSERT embeddings" --> PG
 
     App -- "3 · embed question" --> Embed
-    App -- "4 · cosine similarity search\n(tag-scoped or global)" --> PG
+    App -- "4 · cosine similarity search\n(unfiltered questions only)" --> PG
     PG -- "all chunks in scope (filtered)\ntop-2/candidate, ≤40 candidates (unfiltered)" --> App
     App -- "5 · chat completion\n(chunks + question)" --> LLM
     LLM -- "answer" --> App --> Browser

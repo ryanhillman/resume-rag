@@ -133,9 +133,10 @@ SESSION_TTL_SECS = 8 * 3600
 
 
 def _login_ip(request: Request) -> str:
-    # Caddy appends the real peer to any client-supplied X-Forwarded-For, so only
-    # the last entry is trustworthy. Reading the first would let an attacker send
-    # a fresh bogus value per request and get a new lockout bucket every time.
+    # Caddy replaces any client-supplied X-Forwarded-For with the real peer, so
+    # there is one entry and the last is the one Caddy set. Reading the first
+    # would let an attacker send a bogus value and get a fresh lockout bucket on
+    # every request.
     forwarded = request.headers.get("x-forwarded-for", "")
     return forwarded.split(",")[-1].strip() or (request.client.host if request.client else "unknown")
 
@@ -225,7 +226,6 @@ def extract_visible_text(pdf_bytes: bytes) -> tuple[str, list[str], int]:
     text = "\n".join(pages).strip()
     if SUSPICIOUS.search(text):
         flags.append("instruction_like_text")
-    text = text.replace("<", "&lt;").replace(">", "&gt;")
     seen: set[str] = set()
     flags = [f for f in flags if not (f in seen or seen.add(f))]  # type: ignore[func-returns-value]
     return text, flags, page_count
@@ -477,13 +477,7 @@ def _get_resume_ids_by_tags(tags: list[str]) -> list[str]:
             return [row[0] for row in cur.fetchall()]
 
 
-# ── PGVector helpers ───────────────────────────────────────────────────────────
-
-
-def _drop_resume_vectors(resume_id: str):
-    with _pg() as conn:
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM resume_chunks WHERE resume_id = %s", (resume_id,))
+# ── Candidate details ─────────────────────────────────────────────────────────
 
 
 def _candidate_name(filename: str) -> str:
@@ -585,23 +579,27 @@ def _embed_texts(texts: list[str]) -> list[list[float]]:
     return [item["embedding"] for item in items]
 
 
-def _write_chunks(
-    resume_id: str,
-    candidate_name: str,
-    chunks: list[str],
-    embeddings: list[list[float]],
-) -> None:
+def _write_chunks(resume_id: str, chunks: list[str], embeddings: list[list[float]]) -> None:
+    """Replace this resume's chunks. Deleting first keeps a retry from leaving
+    the previous attempt's chunks behind alongside the new ones."""
     with _pg() as conn:
         with conn.cursor() as cur:
+            cur.execute("DELETE FROM resume_chunks WHERE resume_id = %s", (resume_id,))
             for chunk, emb in zip(chunks, embeddings):
                 vec = "[" + ",".join(str(x) for x in emb) + "]"
                 cur.execute(
                     "INSERT INTO resume_chunks (resume_id, document, embedding) VALUES (%s, %s, %s::vector)",
-                    (resume_id, f"Candidate: {candidate_name}\n\n{chunk}", vec),
+                    (resume_id, chunk, vec),
                 )
 
 
 # ── RAG retrieval and answer generation ───────────────────────────────────────
+
+
+def _label_chunk(document: str, candidate_name: Optional[str], filename: str) -> str:
+    """Name the candidate for the model. Read at query time rather than stored
+    with the chunk, so a correction through PATCH /resumes/{id} reaches it."""
+    return f"Candidate: {candidate_name or _candidate_name(filename)}\n\n{document}"
 
 
 def _fetch_all_chunks(resume_ids: list[str]) -> list[str]:
@@ -610,28 +608,38 @@ def _fetch_all_chunks(resume_ids: list[str]) -> list[str]:
     with _pg() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT document FROM resume_chunks WHERE resume_id = ANY(%s) ORDER BY resume_id, chunk_id",
+                "SELECT c.document, r.candidate_name, r.filename"
+                " FROM resume_chunks c JOIN resumes r USING (resume_id)"
+                " WHERE c.resume_id = ANY(%s)"
+                " ORDER BY c.resume_id, c.chunk_id",
                 (resume_ids,),
             )
-            return [row[0] for row in cur.fetchall()]
+            return [_label_chunk(doc, name, fn) for doc, name, fn in cur.fetchall()]
 
 
-def _retrieve_chunks(query_embedding: list[float]) -> list[str]:
+def _retrieve_chunks(query_embedding: list[float]) -> tuple[list[str], list[str]]:
     """Unfiltered questions: top TOP_K_PER_CANDIDATE chunks for each of the
-    MAX_POOL_CANDIDATES candidates nearest the question."""
+    MAX_POOL_CANDIDATES candidates nearest the question. Returns the chunks and
+    the resume_ids they came from, so the answer cites what the model read."""
     vec = "[" + ",".join(str(x) for x in query_embedding) + "]"
     with _pg() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
                 WITH dists AS (
-                    SELECT document,
-                           resume_id AS rid,
-                           embedding <=> %s::vector AS dist
-                    FROM resume_chunks
+                    SELECT c.document,
+                           c.resume_id AS rid,
+                           r.candidate_name,
+                           r.filename,
+                           c.embedding <=> %s::vector AS dist
+                    FROM resume_chunks c
+                    JOIN resumes r USING (resume_id)
+                    -- Searching the whole pool means the ready resumes, as the
+                    -- tag and candidate lookups also take it to mean.
+                    WHERE r.status = 'ready'
                 ),
                 ranked AS (
-                    SELECT document, rid,
+                    SELECT document, rid, candidate_name, filename,
                            ROW_NUMBER() OVER (PARTITION BY rid ORDER BY dist) AS rn,
                            MIN(dist) OVER (PARTITION BY rid) AS best_score
                     FROM dists
@@ -640,13 +648,17 @@ def _retrieve_chunks(query_embedding: list[float]) -> list[str]:
                     SELECT rid FROM ranked
                     GROUP BY rid ORDER BY MIN(best_score) LIMIT %s
                 )
-                SELECT document FROM ranked
+                SELECT document, rid, candidate_name, filename FROM ranked
                 WHERE rid IN (SELECT rid FROM top_cands) AND rn <= %s
                 ORDER BY best_score, rn
             """,
                 (vec, MAX_POOL_CANDIDATES, TOP_K_PER_CANDIDATE),
             )
-            return [row[0] for row in cur.fetchall()]
+            rows = cur.fetchall()
+            chunks = [_label_chunk(doc, name, fn) for doc, _rid, name, fn in rows]
+            # dict.fromkeys keeps nearest-first order while dropping repeats.
+            read_ids = list(dict.fromkeys(rid for _doc, rid, _name, _fn in rows))
+            return chunks, read_ids
 
 
 def _candidate_roster() -> tuple[str, int]:
@@ -770,11 +782,11 @@ class ChatRequest(BaseModel):
     tags: Optional[list[str]] = None
 
 
-def _ingest(resume_id: str, filename: str, text: str, candidate_name: str):
+def _ingest(resume_id: str, filename: str, text: str):
     try:
         chunks = _chunk_text(text)
         embeddings = _embed_texts(chunks)
-        _write_chunks(resume_id, candidate_name, chunks, embeddings)
+        _write_chunks(resume_id, chunks, embeddings)
         _mark_resume_ready(resume_id, text[:3000])
         log.info("Ingest complete: resume_id=%s file=%s chunks=%d", resume_id, filename, len(chunks))
     except Exception:
@@ -782,7 +794,7 @@ def _ingest(resume_id: str, filename: str, text: str, candidate_name: str):
         log.exception("Ingest failed: resume_id=%s file=%s", resume_id, filename)
 
 
-def _retry_ingest(resume_id: str, filename: str, content: bytes, candidate_name: str):
+def _retry_ingest(resume_id: str, filename: str, content: bytes):
     """Re-extract text from the stored PDF, then re-run ingest."""
     try:
         text, _flags, _pages = extract_visible_text(content)
@@ -790,7 +802,7 @@ def _retry_ingest(resume_id: str, filename: str, content: bytes, candidate_name:
         _update_resume_status(resume_id, "failed")
         log.exception("Retry extraction failed: resume_id=%s", resume_id)
         return
-    _ingest(resume_id, filename, text, candidate_name)
+    _ingest(resume_id, filename, text)
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
@@ -905,7 +917,7 @@ def upload(
     )
     if tag_list:
         _set_resume_tags(resume_id, tag_list)
-    background_tasks.add_task(_ingest, resume_id, file.filename, text, candidate_name)
+    background_tasks.add_task(_ingest, resume_id, file.filename, text)
     return {"resume_id": resume_id, "filename": file.filename, "status": "ingesting"}
 
 
@@ -917,8 +929,7 @@ def retry_resume(resume_id: str, background_tasks: BackgroundTasks):
     if not _claim_failed_resume(resume_id):
         raise HTTPException(status_code=409, detail="Only failed resumes can be retried.")
     file_data = _get_resume_file(resume_id)
-    candidate_name = resume["candidate_name"] or _candidate_name(resume["filename"])
-    background_tasks.add_task(_retry_ingest, resume_id, resume["filename"], file_data, candidate_name)
+    background_tasks.add_task(_retry_ingest, resume_id, resume["filename"], file_data)
     return {"resume_id": resume_id, "filename": resume["filename"], "status": "ingesting"}
 
 
@@ -940,14 +951,16 @@ def chat(req: ChatRequest):
     else:
         scope_ids = None
 
-    sources = _get_candidates(scope_ids)
     scope_note = ""
     if scope_ids is not None:
         # Explicit scope: every candidate's chunks, no ranking or cap.
         chunks = _fetch_all_chunks(scope_ids)
+        sources = _get_candidates(scope_ids)
     else:
         query_embedding = _embed_texts([req.message])
-        chunks = _retrieve_chunks(query_embedding[0])
+        chunks, read_ids = _retrieve_chunks(query_embedding[0])
+        # Only the candidates whose chunks were sent, not every resume stored.
+        sources = _get_candidates(read_ids)
         if _ROSTER_RE.search(req.message):
             roster, count = _candidate_roster()
             if roster:
@@ -1057,6 +1070,6 @@ def delete_resume(resume_id: str):
     resume = _get_resume(resume_id)
     if not resume:
         raise HTTPException(status_code=404, detail="resume_id not found")
-    _drop_resume_vectors(resume_id)
+    # resume_chunks is ON DELETE CASCADE, so the chunks go with the row.
     _delete_resume(resume_id)
     return {"deleted": resume_id}

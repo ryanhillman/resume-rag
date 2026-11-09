@@ -88,7 +88,9 @@ def test_retry_failed_resume(client):
     assert resp.status_code == 200
     assert resp.json()["status"] == "ingesting"
     mock_claim.assert_called_once_with("abc")
-    mock_retry.assert_called_once_with("abc", "r.pdf", b"%PDF", "Rae Park")
+    # The candidate name is not passed through ingest; it is read from resumes
+    # at query time so a correction reaches the model.
+    mock_retry.assert_called_once_with("abc", "r.pdf", b"%PDF")
 
 
 def test_retry_rejects_non_failed_resume(client):
