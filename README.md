@@ -86,6 +86,15 @@ Push to `main` — the checks run, then the deploy.
 
 ---
 
+## Tests
+
+```bash
+pip install -r requirements.txt -r requirements-dev.txt
+pytest tests/
+```
+
+---
+
 ## API
 
 | Method | Path | Auth | Description |
@@ -102,5 +111,5 @@ Push to `main` — the checks run, then the deploy.
 | `PATCH` | `/resumes/{id}` | ✓ | Correct candidate name, email, or phone |
 | `POST` | `/resumes/{id}/retry` | ✓ | Re-run ingest for a failed resume |
 | `DELETE` | `/resumes/{id}` | ✓ | Delete resume and its vectors |
-| `POST` | `/upload` | ✓ | Upload a PDF resume |
+| `POST` | `/upload` | ✓ | Upload a PDF resume: one page, text-based, 5 MB max |
 | `POST` | `/chat` | ✓ | Ask a question (`resume_id`, `resume_ids`, or `tags` optional); returns `answer` + `sources` |
