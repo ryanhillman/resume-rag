@@ -72,23 +72,17 @@ fails over plain HTTP.
 **3. Deploy via CI/CD**
 
 CI authenticates to Azure with a short-lived OIDC token and asks the VM to
-deploy itself; the VM pulls the tested commit with a read-only deploy key. No
-secrets are stored and nothing connects inbound.
+deploy itself; the VM pulls the tested commit from GitHub. No secrets are
+stored and nothing connects inbound.
 
 ```bash
 cd infra
 gh variable set AZURE_CLIENT_ID       --body "$(terraform output -raw deploy_client_id)"
 gh variable set AZURE_TENANT_ID       --body "$(terraform output -raw deploy_tenant_id)"
 gh variable set AZURE_SUBSCRIPTION_ID --body "$(terraform output -raw subscription_id)"
-
-VM=azureuser@<your-hostname>
-ssh "$VM" 'ssh-keygen -t ed25519 -f ~/.ssh/github-deploy -N ""'
-gh api meta --jq '.ssh_keys[]' | sed 's|^|github.com |' | ssh "$VM" 'cat >> ~/.ssh/known_hosts'
-ssh "$VM" 'cat ~/.ssh/github-deploy.pub' > vm-deploy.pub
-gh repo deploy-key add vm-deploy.pub --title "VM (read-only)"
 ```
 
-Push to `main` — lint → audit → test → terraform → deploy.
+Push to `main` — the checks run, then the deploy.
 
 ---
 

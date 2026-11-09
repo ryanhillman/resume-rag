@@ -50,8 +50,6 @@ jobs:
       VM_NAME: resume-rag-vm
       DOMAIN: resume-rag.eastus.cloudapp.azure.com
     steps:
-      - uses: actions/checkout@v7
-
       - name: Authenticate to Azure
         uses: azure/login@v2
         with:
@@ -65,12 +63,9 @@ jobs:
             set -euo pipefail
 
             # Azure runs this as root, and git refuses to work in a checkout
-            # owned by another user, hence a root-owned one. The deploy key and
-            # known_hosts stay with the admin user.
-            export GIT_SSH_COMMAND="ssh -i /home/azureuser/.ssh/github-deploy -o IdentitiesOnly=yes -o UserKnownHostsFile=/home/azureuser/.ssh/known_hosts -o StrictHostKeyChecking=yes"
-
+            # owned by another user, hence a root-owned one.
             [ -d /opt/resume-rag/.git ] ||
-              git clone --depth 1 git@github.com:ryanhillman/resume-rag.git /opt/resume-rag
+              git clone --depth 1 https://github.com/ryanhillman/resume-rag.git /opt/resume-rag
             cd /opt/resume-rag
             git fetch --depth 1 origin ${{ github.sha }}
             git reset --hard FETCH_HEAD
