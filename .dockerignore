@@ -1,0 +1,16 @@
+.git/
+.github/
+infra/
+.env
+.env.*
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+*.egg-info/
+.dockerignore
+.gitignore
+.pre-commit-config.yaml
+README.md
