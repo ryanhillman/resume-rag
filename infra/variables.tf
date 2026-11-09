@@ -55,9 +55,3 @@ variable "ai_custom_subdomain" {
   type        = string
   default     = ""
 }
-
-variable "data_disk_size_gb" {
-  description = "Size of the data disk that holds the Postgres volume. Kept separate from the OS disk so the database survives the VM being rebuilt."
-  type        = number
-  default     = 64
-}

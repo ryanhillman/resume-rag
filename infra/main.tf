@@ -190,30 +190,6 @@ resource "azurerm_linux_virtual_machine" "vm" {
   }
 }
 
-# Postgres lives here rather than on the OS disk, so rebuilding the VM does not
-# destroy the database. cloud-init formats and mounts it at /data on first boot.
-resource "azurerm_managed_disk" "data" {
-  name                 = "${var.prefix}-data"
-  location             = azurerm_resource_group.rg.location
-  resource_group_name  = azurerm_resource_group.rg.name
-  storage_account_type = "StandardSSD_LRS"
-  create_option        = "Empty"
-  disk_size_gb         = var.data_disk_size_gb
-  tags                 = local.tags
-
-  lifecycle {
-    # The database is on this disk; never silently replace it.
-    prevent_destroy = true
-  }
-}
-
-resource "azurerm_virtual_machine_data_disk_attachment" "data" {
-  managed_disk_id    = azurerm_managed_disk.data.id
-  virtual_machine_id = azurerm_linux_virtual_machine.vm.id
-  lun                = 0
-  caching            = "ReadWrite"
-}
-
 # ── GitHub Actions deploy identity ────────────────────────────────────────────
 # GitHub exchanges a short-lived OIDC token for Azure credentials: no secret in
 # the repository, and the deploy reaches the VM through Azure's control plane
