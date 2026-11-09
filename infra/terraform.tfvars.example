@@ -1,0 +1,14 @@
+# Copy to terraform.tfvars and fill in your values.
+# terraform.tfvars is gitignored — never commit it.
+#
+# Only the variables without defaults are listed; see variables.tf for the rest.
+
+ssh_public_key = "ssh-rsa AAAA..."
+
+# Restrict both to your office/VPN CIDR. Leaving as "*" exposes SSH and the
+# app (which handles private resume data) to the public internet.
+allowed_ssh_cidr = "203.0.113.0/32"   # replace with your IP
+allowed_app_cidr = "203.0.113.0/24"   # replace with your office/VPN range
+
+# Override if "<prefix>-ai" is already taken (must be globally unique worldwide)
+# ai_custom_subdomain = "resume-rag-ai-yourname"
