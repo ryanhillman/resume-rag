@@ -264,27 +264,24 @@ def _init_db():
             cur.execute("CREATE EXTENSION IF NOT EXISTS vector")
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS resumes (
-                    resume_id    TEXT PRIMARY KEY,
-                    filename     TEXT NOT NULL,
-                    status       TEXT NOT NULL DEFAULT 'ingesting',
-                    content_hash TEXT,
-                    file_data    BYTEA,
-                    text_preview TEXT,
-                    created_at   TIMESTAMPTZ DEFAULT now()
+                    resume_id      TEXT PRIMARY KEY,
+                    filename       TEXT NOT NULL,
+                    status         TEXT NOT NULL DEFAULT 'ingesting',
+                    content_hash   TEXT,
+                    file_data      BYTEA,
+                    text_preview   TEXT,
+                    flags          TEXT[] DEFAULT '{}',
+                    tags           TEXT[] DEFAULT '{}',
+                    candidate_name TEXT,
+                    email          TEXT,
+                    phone          TEXT,
+                    created_at     TIMESTAMPTZ DEFAULT now()
                 )
             """)
-            cur.execute("ALTER TABLE resumes ADD COLUMN IF NOT EXISTS text_preview TEXT")
-            cur.execute("ALTER TABLE resumes ADD COLUMN IF NOT EXISTS flags TEXT[] DEFAULT '{}'")
-            cur.execute("ALTER TABLE resumes ADD COLUMN IF NOT EXISTS tags  TEXT[] DEFAULT '{}'")
-            cur.execute("ALTER TABLE resumes ADD COLUMN IF NOT EXISTS content_hash TEXT")
-            cur.execute("ALTER TABLE resumes ADD COLUMN IF NOT EXISTS candidate_name TEXT")
-            cur.execute("ALTER TABLE resumes ADD COLUMN IF NOT EXISTS email TEXT")
-            cur.execute("ALTER TABLE resumes ADD COLUMN IF NOT EXISTS phone TEXT")
             cur.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_resumes_content_hash"
                 " ON resumes (content_hash) WHERE content_hash IS NOT NULL"
             )
-            cur.execute("ALTER TABLE resumes DROP COLUMN IF EXISTS content_type")
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS resume_chunks (
                     chunk_id  BIGSERIAL PRIMARY KEY,
@@ -294,19 +291,6 @@ def _init_db():
                 )
             """)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_resume_chunks_resume ON resume_chunks (resume_id)")
-            # One-time move off the LangChain-shaped collection tables this
-            # project started from. Safe to delete once it has run.
-            cur.execute("SELECT to_regclass('rag_embedding') IS NOT NULL")
-            if cur.fetchone()[0]:
-                cur.execute("""
-                    INSERT INTO resume_chunks (resume_id, document, embedding)
-                    SELECT e.cmetadata->>'resume_id', e.document, e.embedding
-                    FROM rag_embedding e
-                    WHERE e.cmetadata->>'resume_id' IN (SELECT resume_id FROM resumes)
-                """)
-                cur.execute("DROP TABLE rag_embedding")
-                cur.execute("DROP TABLE IF EXISTS rag_collection")
-                log.info("Moved chunks off the old collection tables")
             cur.execute("UPDATE resumes SET status = 'failed' WHERE status = 'ingesting'")
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS sessions (
