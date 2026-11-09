@@ -1,0 +1,8 @@
+# Normalize every text file to LF inside the repository, and check it out as
+# LF on all platforms. This project is built and deployed on Linux (Docker,
+# Caddy, cloud-init), where CRLF in a shell script or Dockerfile breaks at
+# runtime rather than at commit time.
+* text=auto eol=lf
+
+# Generated / vendored: collapse in diffs and exclude from language stats.
+infra/.terraform.lock.hcl linguist-generated=true
