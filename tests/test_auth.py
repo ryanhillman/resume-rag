@@ -174,3 +174,12 @@ def test_csrf_still_blocks_invalid_api_key(bare_client):
         headers={"origin": "https://evil.example.com", "X-API-Key": "wrong-key"},
     )
     assert resp.status_code == 403
+
+
+def test_security_headers_on_every_response(client):
+    res = client.get("/health")
+    assert res.headers["Strict-Transport-Security"].startswith("max-age=")
+    assert res.headers["Referrer-Policy"] == "no-referrer"
+    assert res.headers["X-Content-Type-Options"] == "nosniff"
+    assert res.headers["X-Frame-Options"] == "DENY"
+    assert "default-src 'self'" in res.headers["Content-Security-Policy"]

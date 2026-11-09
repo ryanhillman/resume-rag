@@ -741,6 +741,9 @@ async def _security_headers(request: Request, call_next):
     response.headers["Content-Security-Policy"] = _CSP
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
+    # Caddy terminates TLS but does not send HSTS of its own accord.
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Referrer-Policy"] = "no-referrer"
     return response
 
 
@@ -872,6 +875,18 @@ def upload(
             status_code=400,
             detail=f"Unsupported file type '{ext}'. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
         )
+    # Before reading or parsing anything: a bad tag list is cheap to reject.
+    # Unparsed input used to be dropped silently, and a bare number reached the
+    # membership test and raised.
+    try:
+        tag_list = json.loads(tags) if tags else []
+    except ValueError:
+        raise HTTPException(status_code=400, detail="tags must be a JSON array of tag names.")
+    if not isinstance(tag_list, list) or not all(isinstance(t, str) for t in tag_list):
+        raise HTTPException(status_code=400, detail="tags must be a JSON array of tag names.")
+    unknown = [t for t in tag_list if t not in TAGS]
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"Unknown tags: {unknown}")
     content = file.file.read()
     if len(content) > MAX_UPLOAD_BYTES:
         max_mb = MAX_UPLOAD_BYTES // 1_000_000
@@ -894,13 +909,6 @@ def upload(
             status_code=409,
             detail=f"File already uploaded as '{existing['filename']}'.",
         )
-    try:
-        tag_list = json.loads(tags) if tags else []
-    except (json.JSONDecodeError, ValueError):
-        tag_list = []
-    unknown = [t for t in tag_list if t not in TAGS]
-    if unknown:
-        raise HTTPException(status_code=400, detail=f"Unknown tags: {unknown}")
     resume_id = str(uuid.uuid4())
     candidate_name, email, phone = _extract_contact(text, file.filename)
     _register_resume(

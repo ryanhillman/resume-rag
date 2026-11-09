@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+import pytest
 from fpdf import FPDF
 
 
@@ -32,6 +33,18 @@ def test_rejects_oversize_pdf_and_reports_the_real_limit(client):
     )
     assert resp.status_code == 413
     assert "5 MB" in resp.json()["detail"]
+
+
+@pytest.mark.parametrize("tags", ["Java", "5", '{"Java": 1}', '["Java", 5]'])
+def test_rejects_malformed_tags(client, tags):
+    """Not-JSON was dropped silently and a bare number raised a 500."""
+    resp = client.post(
+        "/upload",
+        files={"file": ("resume.pdf", _pdf(text="Ryan Hillman"), "application/pdf")},
+        data={"tags": tags},
+    )
+    assert resp.status_code == 400
+    assert "JSON array" in resp.json()["detail"]
 
 
 def test_rejects_multi_page_pdf(client):
