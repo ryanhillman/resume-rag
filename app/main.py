@@ -46,12 +46,12 @@ PG_DSN = "postgresql://{u}:{p}@postgres:5432/{db}".format(
     db=os.environ.get("POSTGRES_DB", "rag"),
 )
 
-AZURE_EMBED_ENDPOINT = os.environ.get("AZURE_EMBED_ENDPOINT", "").rstrip("/")
-AZURE_EMBED_API_KEY = os.environ.get("AZURE_EMBED_API_KEY", "")
+AZURE_OPENAI_ENDPOINT = os.environ.get("AZURE_OPENAI_ENDPOINT", "").rstrip("/")
+AZURE_OPENAI_API_KEY = os.environ.get("AZURE_OPENAI_API_KEY", "")
 AZURE_EMBED_DEPLOYMENT = os.environ.get("AZURE_EMBED_DEPLOYMENT", "text-embedding-3-small")
 AZURE_LLM_DEPLOYMENT = os.environ.get("AZURE_LLM_DEPLOYMENT", "gpt-5-nano")
 # v1 API: no api-version, deployment goes in the request body as "model".
-AZURE_V1_URL = f"{AZURE_EMBED_ENDPOINT}/openai/v1"
+AZURE_V1_URL = f"{AZURE_OPENAI_ENDPOINT}/openai/v1"
 
 CHUNK_SIZE = 600
 CHUNK_OVERLAP = 80
@@ -569,7 +569,7 @@ def _embed_texts(texts: list[str]) -> list[list[float]]:
     """Embed a batch of texts via Azure OpenAI. Returns embeddings in input order."""
     resp = requests.post(
         f"{AZURE_V1_URL}/embeddings",
-        headers={"api-key": AZURE_EMBED_API_KEY, "Content-Type": "application/json"},
+        headers={"api-key": AZURE_OPENAI_API_KEY, "Content-Type": "application/json"},
         json={"model": AZURE_EMBED_DEPLOYMENT, "input": texts},
         timeout=30,
     )
@@ -681,7 +681,7 @@ def _call_llm(message: str, chunks: list[str], scope_note: str = "") -> str:
     system = f"{SYSTEM_PROMPT} {scope_note}" if scope_note else SYSTEM_PROMPT
     resp = requests.post(
         f"{AZURE_V1_URL}/chat/completions",
-        headers={"api-key": AZURE_EMBED_API_KEY, "Content-Type": "application/json"},
+        headers={"api-key": AZURE_OPENAI_API_KEY, "Content-Type": "application/json"},
         json={
             "model": AZURE_LLM_DEPLOYMENT,
             "messages": [
@@ -714,8 +714,8 @@ async def lifespan(_app: FastAPI):
         raise RuntimeError(f"UI_PASSWORD must be at least {_MIN_PASSWORD_LEN} characters")
     if UI_PASSWORD.lower() in _WEAK_PASSWORDS:
         raise RuntimeError("UI_PASSWORD is a known-weak value; choose a stronger password")
-    if not AZURE_EMBED_ENDPOINT or not AZURE_EMBED_API_KEY:
-        raise RuntimeError("AZURE_EMBED_ENDPOINT and AZURE_EMBED_API_KEY must be set")
+    if not AZURE_OPENAI_ENDPOINT or not AZURE_OPENAI_API_KEY:
+        raise RuntimeError("AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY must be set")
     _init_db()
     _sessions_purge()
     yield

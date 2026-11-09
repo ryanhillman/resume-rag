@@ -6,8 +6,8 @@ from fastapi.testclient import TestClient
 
 os.environ.setdefault("APP_API_KEY", "test-api-key")
 os.environ.setdefault("UI_PASSWORD", "test-password")
-os.environ.setdefault("AZURE_EMBED_ENDPOINT", "https://test.openai.azure.com")
-os.environ.setdefault("AZURE_EMBED_API_KEY", "test-embed-key")
+os.environ.setdefault("AZURE_OPENAI_ENDPOINT", "https://test.openai.azure.com")
+os.environ.setdefault("AZURE_OPENAI_API_KEY", "test-embed-key")
 
 
 @pytest.fixture(scope="session")
