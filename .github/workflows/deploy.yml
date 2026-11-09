@@ -48,7 +48,6 @@ jobs:
     env:
       RESOURCE_GROUP: resume-rag-rg
       VM_NAME: resume-rag-vm
-      DOMAIN: resume-rag.eastus.cloudapp.azure.com
     steps:
       - name: Authenticate to Azure
         uses: azure/login@v2
@@ -72,14 +71,28 @@ jobs:
             git clean -fd
 
             # Unset, compose names the project after the directory and would
-            # build empty volumes, losing Caddy's certificate.
+            # build empty volumes: an empty database and no Caddy certificate.
             export COMPOSE_PROJECT_NAME=azureuser
 
             # .env holds the secrets and sits outside the checkout, beyond
             # git's reach. Quiet because Run Command returns only the last few
-            # KB of output; the public fetch below is what decides success.
+            # KB, which the check and failure logs below must fit inside.
             docker compose --progress quiet --env-file /home/azureuser/.env up -d --build --remove-orphans
             docker image prune -f >/dev/null
+
+            # From the VM, so no dependency on allowed_app_cidr. --resolve stays
+            # local but sends the real hostname, so the real cert is verified.
+            domain=$(grep -m1 '^DOMAIN=' /home/azureuser/.env | cut -d= -f2- | tr -d '\r')
+            for _ in $(seq 1 30); do
+              if curl -fsS -o /dev/null --resolve "$domain:443:127.0.0.1" "https://$domain/"; then
+                echo "app is responding at $domain"
+                exit 0
+              fi
+              sleep 4
+            done
+            echo "no response from $domain within 120s"
+            docker compose --env-file /home/azureuser/.env logs --tail=30
+            exit 1
         run: |
           # "$SCRIPT" expands once, so the $ references within it are read on
           # the VM. One run command name, so each deploy overwrites the last.
@@ -102,18 +115,5 @@ jobs:
           code=$(jq -r '.instanceView.exitCode' view.json)
           echo "script exit code: $code"
           # run-command succeeds if the agent ran the script at all, so the
-          # script's own status has to be asserted here.
+          # script's own status, health check included, is asserted here.
           test "$code" = "0"
-
-      - name: Verify the app answers
-        run: |
-          # As a visitor would, so this also validates the public certificate.
-          for _ in $(seq 1 30); do
-            if curl -fsS -o /dev/null "https://${DOMAIN}/"; then
-              echo "app is responding"
-              exit 0
-            fi
-            sleep 4
-          done
-          echo "app did not respond within 120s"
-          exit 1

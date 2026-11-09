@@ -1,7 +1,4 @@
 # Install once:  pip install pre-commit && pre-commit install
-#
-# Bump pinned revs with:  pre-commit autoupdate
-# (Dependabot does not cover the pre-commit ecosystem.)
 
 repos:
   # ── Secret scanning ────────────────────────────────────────────────────────

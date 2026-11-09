@@ -28,6 +28,18 @@ def test_rejects_non_pdf(client):
     assert ".pdf" in resp.json()["detail"]
 
 
+def test_rejects_oversize_pdf_and_reports_the_real_limit(client):
+    """Dividing by 1024 * 1024 reported 4 MB for a 5,000,000-byte cap."""
+    from app.main import MAX_UPLOAD_BYTES
+
+    resp = client.post(
+        "/upload",
+        files={"file": ("resume.pdf", b"x" * (MAX_UPLOAD_BYTES + 1), "application/pdf")},
+    )
+    assert resp.status_code == 413
+    assert "5 MB" in resp.json()["detail"]
+
+
 def test_rejects_multi_page_pdf(client):
     resp = client.post(
         "/upload",

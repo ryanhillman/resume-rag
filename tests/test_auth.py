@@ -73,8 +73,9 @@ def test_lockout_blocks_even_a_correct_password(bare_client):
 
 
 def test_lockout_not_bypassable_by_spoofing_forwarded_for(bare_client):
-    """Caddy appends the real peer to X-Forwarded-For, so only the last entry is
-    trustworthy. Rotating the client-supplied prefix must not open a new bucket."""
+    """Caddy sets X-Forwarded-For to the client's address, so the last entry is
+    the trustworthy one. Rotating a client-supplied prefix must not open a new
+    bucket."""
     from app.main import _LOGIN_MAX_FAILURES
 
     for i in range(_LOGIN_MAX_FAILURES):
