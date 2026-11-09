@@ -81,9 +81,9 @@ def test_unfiltered_rank_question_gets_full_roster(client):
 
     with (
         patch("app.main._list_resumes", return_value=resumes),
-        patch("app.main._get_candidates", return_value=[]),
+        patch("app.main._get_candidates", return_value=[]) as mock_cands,
         patch("app.main._embed_texts", return_value=[[0.0] * 1536]),
-        patch("app.main._retrieve_chunks", return_value=(["some chunk"], [])),
+        patch("app.main._retrieve_chunks", return_value=(["some chunk"], ["id-7"])),
         patch("app.main._call_llm", side_effect=fake_call_llm),
     ):
         res = client.post("/chat", json={"message": "Rank candidates by seniority."})
@@ -92,6 +92,9 @@ def test_unfiltered_rank_question_gets_full_roster(client):
     for name in names:
         assert name in captured["roster"]
     assert "50 candidates in scope" in captured["scope_note"]
+    # The roster lets the answer rank candidates whose chunks were never sent,
+    # so every ready candidate is cited, not just the retrieved one.
+    assert mock_cands.call_args[0][0] is None
 
 
 def test_prompt_escapes_angle_brackets():

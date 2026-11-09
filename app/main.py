@@ -656,7 +656,6 @@ def _retrieve_chunks(query_embedding: list[float]) -> tuple[list[str], list[str]
             )
             rows = cur.fetchall()
             chunks = [_label_chunk(doc, name, fn) for doc, _rid, name, fn in rows]
-            # dict.fromkeys keeps nearest-first order while dropping repeats.
             read_ids = list(dict.fromkeys(rid for _doc, rid, _name, _fn in rows))
             return chunks, read_ids
 
@@ -955,18 +954,22 @@ def chat(req: ChatRequest):
     if scope_ids is not None:
         # Explicit scope: every candidate's chunks, no ranking or cap.
         chunks = _fetch_all_chunks(scope_ids)
-        sources = _get_candidates(scope_ids)
+        cited_ids = scope_ids
     else:
-        query_embedding = _embed_texts([req.message])
-        chunks, read_ids = _retrieve_chunks(query_embedding[0])
         # Only the candidates whose chunks were sent, not every resume stored.
-        sources = _get_candidates(read_ids)
+        query_embedding = _embed_texts([req.message])
+        chunks, cited_ids = _retrieve_chunks(query_embedding[0])
         if _ROSTER_RE.search(req.message):
             roster, count = _candidate_roster()
             if roster:
                 chunks = [roster, *chunks]
                 scope_note = f"There are {count} candidates in scope; the roster lists all of them."
+                # The roster names everyone, so the answer can rank a candidate
+                # whose chunks were never sent. Cite all of them.
+                cited_ids = None
 
+    # None means every ready candidate.
+    sources = _get_candidates(cited_ids)
     if not chunks:
         return {"answer": "No relevant resume content found.", "sources": sources}
     answer = _call_llm(req.message, chunks, scope_note)
