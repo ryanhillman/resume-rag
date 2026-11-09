@@ -1,5 +1,7 @@
 from unittest.mock import patch
 
+import pytest
+
 from app.main import TAGS
 
 
@@ -59,19 +61,16 @@ def test_patch_contact_rejects_empty_body(client):
     assert res.status_code == 400
 
 
-def test_patch_contact_rejects_blank_name(client):
-    res = client.patch("/resumes/abc", json={"candidate_name": "   "})
-    assert res.status_code == 422
-
-
-def test_patch_contact_rejects_overlong_email(client):
-    res = client.patch("/resumes/abc", json={"email": "a" * 5000})
-    assert res.status_code == 422
-
-
-def test_patch_contact_rejects_malformed_email(client):
-    res = client.patch("/resumes/abc", json={"email": "not-an-email"})
-    assert res.status_code == 422
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"candidate_name": "   "},
+        {"email": "a" * 5000},
+        {"email": "not-an-email"},
+    ],
+)
+def test_patch_contact_rejects_invalid_field(client, body):
+    assert client.patch("/resumes/abc", json=body).status_code == 422
 
 
 def test_patch_contact_missing_resume(client):
