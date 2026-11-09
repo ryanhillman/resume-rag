@@ -81,7 +81,7 @@ def test_retry_failed_resume(client):
     with (
         patch("app.main._get_resume", return_value=resume),
         patch("app.main._claim_failed_resume", return_value=True) as mock_claim,
-        patch("app.main._get_resume_file", return_value=(b"%PDF", "application/pdf")),
+        patch("app.main._get_resume_file", return_value=b"%PDF"),
         patch("app.main._retry_ingest") as mock_retry,
     ):
         resp = client.post("/resumes/abc/retry")
@@ -135,7 +135,7 @@ def test_extract_contact_falls_back_to_filename():
 
 def test_resume_file_inline_by_default(client):
     with (
-        patch("app.main._get_resume_file", return_value=(b"%PDF-1.4", "application/pdf")),
+        patch("app.main._get_resume_file", return_value=b"%PDF-1.4"),
         patch("app.main._get_resume", return_value={"resume_id": "abc", "filename": "r.pdf", "status": "ready"}),
     ):
         resp = client.get("/resumes/abc/file")
@@ -145,7 +145,7 @@ def test_resume_file_inline_by_default(client):
 
 def test_resume_file_attachment_on_download(client):
     with (
-        patch("app.main._get_resume_file", return_value=(b"%PDF-1.4", "application/pdf")),
+        patch("app.main._get_resume_file", return_value=b"%PDF-1.4"),
         patch("app.main._get_resume", return_value={"resume_id": "abc", "filename": "r.pdf", "status": "ready"}),
     ):
         resp = client.get("/resumes/abc/file?download=true")

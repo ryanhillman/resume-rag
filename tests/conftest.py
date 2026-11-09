@@ -13,7 +13,6 @@ os.environ.setdefault("AZURE_EMBED_API_KEY", "test-embed-key")
 @pytest.fixture(scope="session")
 def client():
     with (
-        patch("app.main._ensure_rag_db"),
         patch("app.main._init_db"),
         patch("app.main._sessions_purge"),
     ):

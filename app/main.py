@@ -1,4 +1,3 @@
-import asyncio
 import hashlib
 import io
 import json
@@ -44,7 +43,7 @@ UI_PASSWORD = os.environ.get("UI_PASSWORD", "")
 PG_DSN = "postgresql://{u}:{p}@postgres:5432/{db}".format(
     u=os.environ.get("POSTGRES_USER", "raguser"),
     p=os.environ.get("POSTGRES_PASSWORD", ""),
-    db=os.environ.get("RAG_DB", "rag"),
+    db=os.environ.get("POSTGRES_DB", "rag"),
 )
 
 AZURE_EMBED_ENDPOINT = os.environ.get("AZURE_EMBED_ENDPOINT", "").rstrip("/")
@@ -259,28 +258,6 @@ def _pg():
         conn.close()
 
 
-def _ensure_rag_db():
-    """Create the rag database if it doesn't exist (runs at startup)."""
-    admin_dsn = "postgresql://{u}:{p}@postgres:5432/{db}".format(
-        u=os.environ.get("POSTGRES_USER", "raguser"),
-        p=os.environ.get("POSTGRES_PASSWORD", ""),
-        db=os.environ.get("POSTGRES_DB", "postgres"),
-    )
-    rag_db = os.environ.get("RAG_DB", "rag")
-    conn = psycopg2.connect(admin_dsn)
-    conn.autocommit = True
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", (rag_db,))
-            if not cur.fetchone():
-                # A database name can't be a bind parameter, and rag_db is set by
-                # the operator via RAG_DB, never by a request.
-                cur.execute(f"CREATE DATABASE {rag_db}")
-                log.info("Created database: %s", rag_db)
-    finally:
-        conn.close()
-
-
 def _init_db():
     with _pg() as conn:
         with conn.cursor() as cur:
@@ -290,7 +267,6 @@ def _init_db():
                     resume_id    TEXT PRIMARY KEY,
                     filename     TEXT NOT NULL,
                     status       TEXT NOT NULL DEFAULT 'ingesting',
-                    content_type TEXT,
                     content_hash TEXT,
                     file_data    BYTEA,
                     text_preview TEXT,
@@ -308,23 +284,29 @@ def _init_db():
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_resumes_content_hash"
                 " ON resumes (content_hash) WHERE content_hash IS NOT NULL"
             )
+            cur.execute("ALTER TABLE resumes DROP COLUMN IF EXISTS content_type")
             cur.execute("""
-                CREATE TABLE IF NOT EXISTS rag_collection (
-                    uuid      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                    name      VARCHAR NOT NULL UNIQUE,
-                    cmetadata JSON
+                CREATE TABLE IF NOT EXISTS resume_chunks (
+                    chunk_id  BIGSERIAL PRIMARY KEY,
+                    resume_id TEXT NOT NULL REFERENCES resumes(resume_id) ON DELETE CASCADE,
+                    document  TEXT NOT NULL,
+                    embedding VECTOR(1536)
                 )
             """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS rag_embedding (
-                    uuid          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                    collection_id UUID REFERENCES rag_collection(uuid) ON DELETE CASCADE,
-                    embedding     VECTOR(1536),
-                    document      TEXT,
-                    cmetadata     JSON
-                )
-            """)
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_embedding_collection ON rag_embedding (collection_id)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_resume_chunks_resume ON resume_chunks (resume_id)")
+            # One-time move off the LangChain-shaped collection tables this
+            # project started from. Safe to delete once it has run.
+            cur.execute("SELECT to_regclass('rag_embedding') IS NOT NULL")
+            if cur.fetchone()[0]:
+                cur.execute("""
+                    INSERT INTO resume_chunks (resume_id, document, embedding)
+                    SELECT e.cmetadata->>'resume_id', e.document, e.embedding
+                    FROM rag_embedding e
+                    WHERE e.cmetadata->>'resume_id' IN (SELECT resume_id FROM resumes)
+                """)
+                cur.execute("DROP TABLE rag_embedding")
+                cur.execute("DROP TABLE IF EXISTS rag_collection")
+                log.info("Moved chunks off the old collection tables")
             cur.execute("UPDATE resumes SET status = 'failed' WHERE status = 'ingesting'")
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS sessions (
@@ -359,7 +341,6 @@ def _register_resume(
     resume_id: str,
     filename: str,
     content: bytes,
-    content_type: str,
     flags: list,
     content_hash: str,
     candidate_name: str,
@@ -370,13 +351,12 @@ def _register_resume(
         with conn.cursor() as cur:
             cur.execute(
                 "INSERT INTO resumes"
-                " (resume_id, filename, content_type, file_data, flags, content_hash,"
+                " (resume_id, filename, file_data, flags, content_hash,"
                 "  candidate_name, email, phone)"
-                " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                " VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
                 (
                     resume_id,
                     filename,
-                    content_type,
                     psycopg2.Binary(content),
                     flags,
                     content_hash,
@@ -453,15 +433,12 @@ def _get_resume(resume_id: str) -> Optional[dict]:
             return dict(row) if row else None
 
 
-def _get_resume_file(resume_id: str) -> Optional[tuple[bytes, str]]:
+def _get_resume_file(resume_id: str) -> Optional[bytes]:
     with _pg() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT file_data, content_type FROM resumes WHERE resume_id = %s",
-                (resume_id,),
-            )
+            cur.execute("SELECT file_data FROM resumes WHERE resume_id = %s", (resume_id,))
             row = cur.fetchone()
-            return (bytes(row[0]), row[1]) if row else None
+            return bytes(row[0]) if row else None
 
 
 def _delete_resume(resume_id: str):
@@ -522,16 +499,7 @@ def _get_resume_ids_by_tags(tags: list[str]) -> list[str]:
 def _drop_resume_vectors(resume_id: str):
     with _pg() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                """
-                DELETE FROM rag_embedding
-                WHERE collection_id = (
-                    SELECT uuid FROM rag_collection WHERE name = 'all_resumes'
-                )
-                AND cmetadata->>'resume_id' = %s
-            """,
-                (resume_id,),
-            )
+            cur.execute("DELETE FROM resume_chunks WHERE resume_id = %s", (resume_id,))
 
 
 def _candidate_name(filename: str) -> str:
@@ -633,37 +601,19 @@ def _embed_texts(texts: list[str]) -> list[list[float]]:
     return [item["embedding"] for item in items]
 
 
-def _ensure_collection(cur, name: str) -> str:
-    """Return the UUID of a rag_collection row, creating it if absent."""
-    cur.execute("SELECT uuid FROM rag_collection WHERE name = %s", (name,))
-    row = cur.fetchone()
-    if row:
-        return row[0]
-    cur.execute(
-        "INSERT INTO rag_collection (uuid, name, cmetadata) VALUES (gen_random_uuid(), %s, '{}') RETURNING uuid",
-        (name,),
-    )
-    return cur.fetchone()[0]
-
-
-def _write_chunks_to_pgvector(
+def _write_chunks(
     resume_id: str,
     candidate_name: str,
-    filename: str,
     chunks: list[str],
     embeddings: list[list[float]],
 ) -> None:
-    all_meta = json.dumps({"resume_id": resume_id, "candidate_name": candidate_name, "source": filename})
     with _pg() as conn:
         with conn.cursor() as cur:
-            all_uuid = _ensure_collection(cur, "all_resumes")
             for chunk, emb in zip(chunks, embeddings):
                 vec = "[" + ",".join(str(x) for x in emb) + "]"
                 cur.execute(
-                    "INSERT INTO rag_embedding"
-                    " (uuid, collection_id, embedding, document, cmetadata)"
-                    " VALUES (gen_random_uuid(), %s, %s::vector, %s, %s)",
-                    (all_uuid, vec, f"Candidate: {candidate_name}\n\n{chunk}", all_meta),
+                    "INSERT INTO resume_chunks (resume_id, document, embedding) VALUES (%s, %s, %s::vector)",
+                    (resume_id, f"Candidate: {candidate_name}\n\n{chunk}", vec),
                 )
 
 
@@ -676,14 +626,7 @@ def _fetch_all_chunks(resume_ids: list[str]) -> list[str]:
     with _pg() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                """
-                SELECT e.document
-                FROM rag_embedding e
-                JOIN rag_collection c ON e.collection_id = c.uuid
-                WHERE c.name = 'all_resumes'
-                  AND e.cmetadata->>'resume_id' = ANY(%s)
-                ORDER BY e.cmetadata->>'resume_id'
-            """,
+                "SELECT document FROM resume_chunks WHERE resume_id = ANY(%s) ORDER BY resume_id, chunk_id",
                 (resume_ids,),
             )
             return [row[0] for row in cur.fetchall()]
@@ -698,12 +641,10 @@ def _retrieve_chunks(query_embedding: list[float]) -> list[str]:
             cur.execute(
                 """
                 WITH dists AS (
-                    SELECT e.document,
-                           e.cmetadata->>'resume_id' AS rid,
-                           e.embedding <=> %s::vector AS dist
-                    FROM rag_embedding e
-                    JOIN rag_collection c ON e.collection_id = c.uuid
-                    WHERE c.name = 'all_resumes'
+                    SELECT document,
+                           resume_id AS rid,
+                           embedding <=> %s::vector AS dist
+                    FROM resume_chunks
                 ),
                 ranked AS (
                     SELECT document, rid,
@@ -781,7 +722,6 @@ async def lifespan(_app: FastAPI):
         raise RuntimeError("UI_PASSWORD is a known-weak value; choose a stronger password")
     if not AZURE_EMBED_ENDPOINT or not AZURE_EMBED_API_KEY:
         raise RuntimeError("AZURE_EMBED_ENDPOINT and AZURE_EMBED_API_KEY must be set")
-    _ensure_rag_db()
     _init_db()
     _sessions_purge()
     yield
@@ -843,7 +783,6 @@ class ChatRequest(BaseModel):
     message: str
     resume_id: Optional[str] = None
     resume_ids: Optional[list[str]] = None
-    session_id: Optional[str] = None
     tags: Optional[list[str]] = None
 
 
@@ -851,7 +790,7 @@ def _ingest(resume_id: str, filename: str, text: str, candidate_name: str):
     try:
         chunks = _chunk_text(text)
         embeddings = _embed_texts(chunks)
-        _write_chunks_to_pgvector(resume_id, candidate_name, filename, chunks, embeddings)
+        _write_chunks(resume_id, candidate_name, chunks, embeddings)
         _mark_resume_ready(resume_id, text[:3000])
         log.info("Ingest complete: resume_id=%s file=%s chunks=%d", resume_id, filename, len(chunks))
     except Exception:
@@ -891,7 +830,7 @@ def serve_app_js():
 
 
 @app.post("/login")
-async def login(request: Request, password: str = Form(...)):
+def login(request: Request, password: str = Form(...)):
     ip = _login_ip(request)
     # Must precede the password check: honouring a correct password while locked
     # out would let an attacker's eventual right guess through, throttling nothing.
@@ -907,7 +846,7 @@ async def login(request: Request, password: str = Form(...)):
         _clear_failures(ip)
         token = secrets.token_urlsafe(32)
         expires_at = time.time() + SESSION_TTL_SECS
-        await asyncio.to_thread(_session_create, token, expires_at)
+        _session_create(token, expires_at)
         resp = Response(status_code=303, headers={"Location": "/"})
         resp.set_cookie("rag_session", token, httponly=True, secure=True, samesite="strict", max_age=SESSION_TTL_SECS)
         return resp
@@ -919,16 +858,16 @@ async def login(request: Request, password: str = Form(...)):
 
 
 @app.post("/logout")
-async def logout(rag_session: Optional[str] = Cookie(None)):
+def logout(rag_session: Optional[str] = Cookie(None)):
     if rag_session:
-        await asyncio.to_thread(_session_delete, rag_session)
+        _session_delete(rag_session)
     resp = Response(status_code=303, headers={"Location": "/"})
     resp.delete_cookie("rag_session")
     return resp
 
 
 @app.post("/upload", dependencies=[Depends(require_api_key)])
-async def upload(
+def upload(
     background_tasks: BackgroundTasks,
     file: UploadFile = FastAPIFile(...),
     tags: str = Form(""),
@@ -939,12 +878,12 @@ async def upload(
             status_code=400,
             detail=f"Unsupported file type '{ext}'. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
         )
-    content = await file.read()
+    content = file.file.read()
     if len(content) > MAX_UPLOAD_BYTES:
         max_mb = MAX_UPLOAD_BYTES // (1024 * 1024)
         raise HTTPException(status_code=413, detail=f"File too large. Maximum size is {max_mb} MB.")
     try:
-        text, flags, page_count = await asyncio.to_thread(extract_visible_text, content)
+        text, flags, page_count = extract_visible_text(content)
     except Exception:
         raise HTTPException(status_code=400, detail="Could not read this PDF. Please upload a valid PDF.")
     if page_count > 1:
@@ -955,7 +894,7 @@ async def upload(
             detail="Could not extract text. Please upload a text-based PDF.",
         )
     content_hash = hashlib.sha256(content).hexdigest()
-    existing = await asyncio.to_thread(_get_resume_by_hash, content_hash)
+    existing = _get_resume_by_hash(content_hash)
     if existing:
         raise HTTPException(
             status_code=409,
@@ -970,12 +909,10 @@ async def upload(
         raise HTTPException(status_code=400, detail=f"Unknown tags: {unknown}")
     resume_id = str(uuid.uuid4())
     candidate_name, email, phone = _extract_contact(text, file.filename)
-    await asyncio.to_thread(
-        _register_resume,
+    _register_resume(
         resume_id,
         file.filename,
         content,
-        file.content_type or "application/octet-stream",
         flags,
         content_hash,
         candidate_name,
@@ -983,28 +920,28 @@ async def upload(
         phone,
     )
     if tag_list:
-        await asyncio.to_thread(_set_resume_tags, resume_id, tag_list)
+        _set_resume_tags(resume_id, tag_list)
     background_tasks.add_task(_ingest, resume_id, file.filename, text, candidate_name)
     return {"resume_id": resume_id, "filename": file.filename, "status": "ingesting"}
 
 
 @app.post("/resumes/{resume_id}/retry", dependencies=[Depends(require_api_key)])
-async def retry_resume(resume_id: str, background_tasks: BackgroundTasks):
-    resume = await asyncio.to_thread(_get_resume, resume_id)
+def retry_resume(resume_id: str, background_tasks: BackgroundTasks):
+    resume = _get_resume(resume_id)
     if not resume:
         raise HTTPException(status_code=404, detail="resume_id not found")
-    if not await asyncio.to_thread(_claim_failed_resume, resume_id):
+    if not _claim_failed_resume(resume_id):
         raise HTTPException(status_code=409, detail="Only failed resumes can be retried.")
-    file_data, _ = await asyncio.to_thread(_get_resume_file, resume_id)
+    file_data = _get_resume_file(resume_id)
     candidate_name = resume["candidate_name"] or _candidate_name(resume["filename"])
     background_tasks.add_task(_retry_ingest, resume_id, resume["filename"], file_data, candidate_name)
     return {"resume_id": resume_id, "filename": resume["filename"], "status": "ingesting"}
 
 
 @app.post("/chat", dependencies=[Depends(require_api_key)])
-async def chat(req: ChatRequest):
+def chat(req: ChatRequest):
     if req.resume_id:
-        if not await asyncio.to_thread(_get_resume, req.resume_id):
+        if not _get_resume(req.resume_id):
             raise HTTPException(status_code=404, detail="resume_id not found")
         scope_ids = [req.resume_id]
     elif req.resume_ids:
@@ -1013,29 +950,29 @@ async def chat(req: ChatRequest):
         unknown = [t for t in req.tags if t not in TAGS]
         if unknown:
             raise HTTPException(status_code=400, detail=f"Unknown tags: {unknown}")
-        scope_ids = await asyncio.to_thread(_get_resume_ids_by_tags, req.tags)
+        scope_ids = _get_resume_ids_by_tags(req.tags)
         if not scope_ids:
             return {"answer": "No resumes with the selected tags have been ingested yet.", "sources": []}
     else:
         scope_ids = None
 
-    sources = await asyncio.to_thread(_get_candidates, scope_ids)
+    sources = _get_candidates(scope_ids)
     scope_note = ""
     if scope_ids is not None:
         # Explicit scope: every candidate's chunks, no ranking or cap.
-        chunks = await asyncio.to_thread(_fetch_all_chunks, scope_ids)
+        chunks = _fetch_all_chunks(scope_ids)
     else:
-        query_embedding = await asyncio.to_thread(_embed_texts, [req.message])
-        chunks = await asyncio.to_thread(_retrieve_chunks, query_embedding[0])
+        query_embedding = _embed_texts([req.message])
+        chunks = _retrieve_chunks(query_embedding[0])
         if _ROSTER_RE.search(req.message):
-            roster, count = await asyncio.to_thread(_candidate_roster)
+            roster, count = _candidate_roster()
             if roster:
                 chunks = [roster, *chunks]
                 scope_note = f"There are {count} candidates in scope; the roster lists all of them."
 
     if not chunks:
         return {"answer": "No relevant resume content found.", "sources": sources}
-    answer = await asyncio.to_thread(_call_llm, req.message, chunks, scope_note)
+    answer = _call_llm(req.message, chunks, scope_note)
     if not answer or not answer.strip():
         raise HTTPException(status_code=502, detail="Model returned an empty response. Please try again.")
     return {"answer": answer, "sources": sources}
@@ -1058,13 +995,12 @@ def get_resume(resume_id: str):
 
 
 @app.get("/resumes/{resume_id}/file", dependencies=[Depends(require_api_key)])
-async def resume_file(resume_id: str, download: bool = False):
+def resume_file(resume_id: str, download: bool = False):
     """Serve the original PDF inline for viewing; ?download=true to save."""
-    result = await asyncio.to_thread(_get_resume_file, resume_id)
-    if not result:
+    file_data = _get_resume_file(resume_id)
+    if file_data is None:
         raise HTTPException(status_code=404, detail="resume_id not found")
-    file_data, content_type = result
-    resume = await asyncio.to_thread(_get_resume, resume_id)
+    resume = _get_resume(resume_id)
     filename = resume["filename"] if resume else "resume"
     ascii_name = filename.encode("ascii", errors="replace").decode("ascii")
     encoded_name = quote(filename, encoding="utf-8")

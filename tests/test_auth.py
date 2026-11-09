@@ -14,7 +14,6 @@ def _h(token: str) -> str:
 @pytest.fixture(scope="module")
 def bare_client():
     with (
-        patch("app.main._ensure_rag_db"),
         patch("app.main._init_db"),
         patch("app.main._sessions_purge"),
         patch("app.main._session_create", side_effect=lambda t, _: _live_sessions.add(_h(t))),

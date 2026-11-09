@@ -1,9 +1,3 @@
-const sessionId = (crypto.randomUUID?.() ??
-  'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-    const r = Math.random() * 16 | 0;
-    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-  }));
-
 async function apiFetch(url, opts = {}) {
   const res = await fetch(url, opts);
   if (res.status === 401) { window.location.href = '/'; return null; }
@@ -339,7 +333,7 @@ async function sendMessage() {
   const out = document.getElementById('chatOutput');
   out.innerHTML = '<em style="color:#6c757d">Thinking…</em>';
   try {
-    const body = { message, session_id: sessionId };
+    const body = { message };
     if (chatResumeId) {
       body.resume_id = chatResumeId;
     } else if (activeFilters.size) {
