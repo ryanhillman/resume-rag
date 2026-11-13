@@ -831,7 +831,11 @@ def _retry_ingest(resume_id: str, filename: str, content: bytes):
 
 
 @app.get("/health")
-async def health():
+def health():
+    """Readiness, not liveness: a deploy that cannot reach Postgres fails here."""
+    with _pg() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1")
     return {"status": "ok"}
 
 
