@@ -134,6 +134,10 @@ function renderResumeList() {
     const statusBadge = document.createElement('span');
     statusBadge.className = `badge badge-${status}`;
     statusBadge.textContent = status;
+    const viewBtn = document.createElement('button');
+    viewBtn.className = 'btn-sm btn-view';
+    viewBtn.textContent = 'View';
+    viewBtn.addEventListener('click', () => window.open(`/resumes/${resume_id}/file`, '_blank', 'noopener'));
     const dlBtn = document.createElement('button');
     dlBtn.className = 'btn-sm btn-download';
     dlBtn.textContent = 'Download';
@@ -152,7 +156,15 @@ function renderResumeList() {
       warnBadge.textContent = '⚠ injection risk';
       topRow.appendChild(warnBadge);
     }
-    topRow.append(dlBtn, delBtn);
+    if (status === 'failed') {
+      const retryBtn = document.createElement('button');
+      retryBtn.className = 'btn-sm btn-retry';
+      retryBtn.textContent = 'Retry';
+      retryBtn.title = 'Run the ingest again from the stored PDF';
+      retryBtn.addEventListener('click', () => retryResume(resume_id, retryBtn));
+      topRow.append(retryBtn);
+    }
+    topRow.append(viewBtn, dlBtn, delBtn);
     // Only the tags this candidate carries; click one to remove it.
     const tagRow = document.createElement('div');
     tagRow.className = 'tag-row';
@@ -203,9 +215,29 @@ async function toggleTag(resumeId, chip) {
   }
 }
 
+async function retryResume(resumeId, btn) {
+  btn.disabled = true;
+  const statusEl = document.getElementById('deleteStatus');
+  try {
+    const res = await apiFetch(`/resumes/${resumeId}/retry`, {method: 'POST'});
+    if (!res) return;
+    if (!res.ok) throw new Error(await res.text());
+    const idx = resumeData.findIndex(r => r.resume_id === resumeId);
+    if (idx !== -1) resumeData[idx].status = 'ingesting';
+    statusEl.className = 'status';
+    statusEl.textContent = 'Re-running ingest…';
+    renderResumeList();
+    pollIngest(resumeId, statusEl);
+  } catch(e) {
+    btn.disabled = false;
+    statusEl.className = 'status error';
+    statusEl.textContent = 'Retry failed: ' + e.message;
+  }
+}
+
 async function downloadResume(resumeId, filename) {
   try {
-    const res = await apiFetch(`/resumes/${resumeId}/file`);
+    const res = await apiFetch(`/resumes/${resumeId}/file?download=true`);
     if (!res) return;
     if (!res.ok) throw new Error(await res.text());
     const blob = await res.blob();
