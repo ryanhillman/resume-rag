@@ -82,7 +82,7 @@ jobs:
             # local but sends the real hostname, so the real cert is verified.
             domain=$(grep -m1 '^DOMAIN=' /home/azureuser/.env | cut -d= -f2- | tr -d '\r')
             for _ in $(seq 1 30); do
-              if curl -fsS -o /dev/null --resolve "$domain:443:127.0.0.1" "https://$domain/"; then
+              if curl -fsS -o /dev/null --resolve "$domain:443:127.0.0.1" "https://$domain/health"; then
                 echo "app is responding at $domain"
                 exit 0
               fi

@@ -178,7 +178,7 @@ def test_csrf_still_blocks_invalid_api_key(bare_client):
 
 
 def test_security_headers_on_every_response(client, bare_client):
-    res = client.get("/health")
+    res = client.get("/")
     assert res.headers["Strict-Transport-Security"].startswith("max-age=")
     # no-referrer would make browsers post Origin: null and trip the CSRF check.
     assert res.headers["Referrer-Policy"] == "same-origin"
@@ -196,3 +196,20 @@ def test_security_headers_on_every_response(client, bare_client):
     assert blocked.status_code == 403
     assert blocked.headers["Strict-Transport-Security"].startswith("max-age=")
     assert "default-src 'self'" in blocked.headers["Content-Security-Policy"]
+
+
+# --- Health ---
+
+
+def test_health_ok_when_the_database_answers(client):
+    with patch("app.main._pg"):
+        res = client.get("/health")
+    assert res.status_code == 200
+    assert res.json() == {"status": "ok"}
+
+
+def test_health_fails_when_the_database_is_unreachable(client):
+    """The deploy probe must not pass while Postgres is down."""
+    with patch("app.main._pg", side_effect=RuntimeError("connection refused")):
+        with pytest.raises(RuntimeError):
+            client.get("/health")
