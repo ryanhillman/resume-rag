@@ -7,6 +7,7 @@ async function apiFetch(url, opts = {}) {
 // ── Tag state ──────────────────────────────────────────────────────────────────
 let ALL_TAGS = [];
 let activeFilters = new Set();
+let candidateQuery = '';
 let uploadTags = new Set();
 let resumeData = [];
 let chatResumeId = null;
@@ -99,22 +100,37 @@ async function refreshResumes() {
   } catch(e) { console.error('Could not load resumes', e); }
 }
 
+function formatUploaded(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  return isNaN(d) ? '' : d.toLocaleDateString(undefined, {year: 'numeric', month: 'short', day: 'numeric'});
+}
+
 function renderResumeList() {
   const list = document.getElementById('resumeList');
   list.innerHTML = '';
-  const visible = activeFilters.size
-    ? resumeData.filter(r => [...activeFilters].every(t => (r.tags || []).includes(t)))
-    : resumeData;
+  const q = candidateQuery.trim().toLowerCase();
+  const visible = resumeData.filter(r => {
+    if (activeFilters.size && ![...activeFilters].every(t => (r.tags || []).includes(t))) return false;
+    if (!q) return true;
+    return [r.candidate_name, r.email, r.filename].some(v => (v || '').toLowerCase().includes(q));
+  });
   if (!visible.length) {
-    list.innerHTML = '<p style="color:#6c757d;font-size:0.88rem">' +
-      (activeFilters.size ? 'No resumes match the active filter.' : 'No resumes uploaded yet.') + '</p>';
+    list.innerHTML = '<p class="empty">' +
+      (resumeData.length ? 'No candidates match.' : 'No resumes uploaded yet.') + '</p>';
     return;
   }
   for (const r of visible) {
-    const {resume_id, filename, status, flags, tags} = r;
+    const {resume_id, filename, status, flags, tags, candidate_name, email, created_at} = r;
     const nameSpan = document.createElement('span');
     nameSpan.className = 'name';
-    nameSpan.textContent = filename;
+    const primary = document.createElement('span');
+    primary.className = 'cand-name';
+    primary.textContent = candidate_name || filename;
+    const secondary = document.createElement('span');
+    secondary.className = 'cand-file';
+    secondary.textContent = [email, filename, formatUploaded(created_at)].filter(Boolean).join(' · ');
+    nameSpan.append(primary, secondary);
     const statusBadge = document.createElement('span');
     statusBadge.className = `badge badge-${status}`;
     statusBadge.textContent = status;
@@ -137,22 +153,25 @@ function renderResumeList() {
       topRow.appendChild(warnBadge);
     }
     topRow.append(dlBtn, delBtn);
-    // Tag row: all tags shown, dimmed unless applied; click to toggle
+    // Only the tags this candidate carries; click one to remove it.
     const tagRow = document.createElement('div');
     tagRow.className = 'tag-row';
-    for (const tag of ALL_TAGS) {
-      const applied = (tags || []).includes(tag.name);
+    for (const tagName of tags || []) {
+      const tag = ALL_TAGS.find(t => t.name === tagName);
+      if (!tag) continue;
       const chip = document.createElement('button');
-      chip.className = 'tag-chip' + (applied ? '' : ' off');
+      chip.className = 'tag-chip';
       chip.style.cssText = `background:${tag.bg};color:${tag.text}`;
       chip.textContent = tag.name;
       chip.dataset.tag = tag.name;
+      chip.title = `Remove ${tag.name}`;
       chip.addEventListener('click', () => toggleTag(resume_id, chip));
       tagRow.appendChild(chip);
     }
     const card = document.createElement('div');
     card.className = 'resume-card';
-    card.append(topRow, tagRow);
+    card.append(topRow);
+    if (tagRow.children.length) card.append(tagRow);
     list.appendChild(card);
   }
 }
@@ -163,9 +182,10 @@ async function toggleTag(resumeId, chip) {
   if (idx === -1) return;
   const prev = resumeData[idx].tags || [];
   const next = prev.includes(tagName) ? prev.filter(t => t !== tagName) : [...prev, tagName];
-  // Optimistic update
+  // Optimistic update; the chip has to leave the row, so re-render it.
   resumeData[idx].tags = next;
-  chip.className = 'tag-chip' + (next.includes(tagName) ? '' : ' off');
+  renderResumeList();
+  renderScopeLabel();
   try {
     const res = await apiFetch(`/resumes/${resumeId}/tags`, {
       method: 'PUT',
@@ -177,7 +197,8 @@ async function toggleTag(resumeId, chip) {
   } catch(e) {
     // Rollback
     resumeData[idx].tags = prev;
-    chip.className = 'tag-chip' + (prev.includes(tagName) ? '' : ' off');
+    renderResumeList();
+    renderScopeLabel();
     console.error('Tag update failed', e);
   }
 }
@@ -305,19 +326,22 @@ function clearChatScope() {
 function showResumeSuggestions(query) {
   const box = document.getElementById('resumeSuggestions');
   if (!query.trim()) { box.style.display = 'none'; return; }
+  const q = query.toLowerCase();
   const matches = resumeData.filter(r =>
-    r.status === 'ready' && r.filename.toLowerCase().includes(query.toLowerCase())
+    r.status === 'ready' &&
+    [r.candidate_name, r.email, r.filename].some(v => (v || '').toLowerCase().includes(q))
   );
   if (!matches.length) { box.style.display = 'none'; return; }
   box.innerHTML = '';
   for (const r of matches.slice(0, 8)) {
     const item = document.createElement('div');
     item.className = 'suggestion';
-    item.textContent = r.filename;
+    const label = r.candidate_name || r.filename;
+    item.textContent = label;
     item.addEventListener('click', () => {
       chatResumeId = r.resume_id;
-      chatResumeName = r.filename;
-      document.getElementById('resumeSearch').value = r.filename;
+      chatResumeName = label;
+      document.getElementById('resumeSearch').value = label;
       box.style.display = 'none';
       renderScopeLabel();
     });
@@ -361,6 +385,10 @@ document.getElementById('uploadBtn').addEventListener('click', uploadFile);
 document.getElementById('sendBtn').addEventListener('click', sendMessage);
 document.getElementById('messageInput').addEventListener('keydown', e => {
   if (e.key === 'Enter') sendMessage();
+});
+document.getElementById('candidateSearch').addEventListener('input', e => {
+  candidateQuery = e.target.value;
+  renderResumeList();
 });
 document.getElementById('resumeSearch').addEventListener('input', e => {
   showResumeSuggestions(e.target.value);
