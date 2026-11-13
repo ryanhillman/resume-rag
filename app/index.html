@@ -8,12 +8,27 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #f8f9fa; color: #212529; padding: 40px 16px;
+      background: #f8f9fa; color: #212529; padding: 32px 28px;
+      display: flex; flex-direction: column; height: 100vh; overflow: hidden;
     }
-    .container { max-width: 680px; margin: 0 auto; }
-    h1 { font-size: 1.5rem; font-weight: 600; margin-bottom: 8px; }
-    p.subtitle { color: #6c757d; margin-bottom: 32px; font-size: 0.95rem; }
-    .card { background: #fff; border: 1px solid #dee2e6; border-radius: 8px; padding: 24px; margin-bottom: 20px; }
+    .topbar { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 20px; }
+    /* minmax(0, …) on both tracks: a long filename or the file input would
+       otherwise widen a column past its share. min-height: 0 on every flex
+       ancestor of a scroll area, or the area grows instead of scrolling. */
+    .layout {
+      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px; flex: 1; min-height: 0;
+    }
+    .rail { display: flex; flex-direction: column; gap: 20px; min-height: 0; }
+    .list-card, .chat-card { display: flex; flex-direction: column; min-height: 0; }
+    .list-card { flex: 1; }
+    @media (max-width: 860px) {
+      body { display: block; height: auto; overflow: visible; }
+      .layout { grid-template-columns: 1fr; }
+      #resumeList { overflow: visible; }
+    }
+    h1 { font-size: 1.5rem; font-weight: 600; }
+    .card { background: #fff; border: 1px solid #dee2e6; border-radius: 8px; padding: 24px; }
     h2 { font-size: 1rem; font-weight: 600; margin-bottom: 14px; color: #495057; }
     .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     input[type="file"] { flex: 1; min-width: 0; font-size: 0.9rem; }
@@ -26,6 +41,11 @@
       border: none; border-radius: 6px; font-size: 0.9rem; cursor: pointer; white-space: nowrap;
     }
     button:hover { background: #0b5ed7; }
+    .btn-link {
+      background: none; color: #6c757d; border: none; padding: 0;
+      font-size: 0.85rem; cursor: pointer; text-decoration: underline;
+    }
+    .btn-link:hover { background: none; color: #212529; }
     .status { margin-top: 10px; font-size: 0.88rem; color: #6c757d; min-height: 20px; }
     .status.error { color: #dc3545; }
     .resume-row { display: flex; align-items: center; justify-content: space-between; font-size: 0.9rem; gap: 6px; }
@@ -38,8 +58,8 @@
     .btn-sm { padding: 3px 10px; background: #fff; border-radius: 4px; font-size: 0.8rem; cursor: pointer; }
     .resume-card { padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
     .resume-card:last-child { border-bottom: none; }
-    .resume-row { display: flex; align-items: center; justify-content: space-between; font-size: 0.9rem; gap: 6px; }
     .tag-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+    #uploadTagRow { margin-top: 10px; }
     .tag-chip {
       display: inline-flex; align-items: center; padding: 1px 7px; border-radius: 10px;
       font-size: 0.72rem; font-weight: 500; cursor: pointer; border: none; outline: none;
@@ -58,11 +78,17 @@
     .btn-download:hover { background: #0d6efd; color: #fff; }
     .btn-delete { color: #dc3545; border: 1px solid #dc3545; }
     .btn-delete:hover { background: #dc3545; color: #fff; }
+    #resumeList { overflow-y: auto; flex: 1; min-height: 0; }
+    .search-wrap { position: relative; margin-bottom: 8px; }
+    .search-wrap input { width: 100%; }
+    #scopeLabel { font-size: 0.82rem; color: #6c757d; margin-bottom: 10px; }
     #chatOutput {
       margin-top: 12px; word-break: break-word;
       background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px;
-      padding: 12px; font-size: 0.9rem; min-height: 48px; line-height: 1.6;
+      padding: 12px; font-size: 0.9rem; line-height: 1.6;
+      flex: 1; min-height: 48px; overflow-y: auto;
     }
+    #chatOutput > * { max-width: 80ch; }
     #chatOutput p { margin: 0 0 8px; }
     #chatOutput p:last-child { margin-bottom: 0; }
     #chatOutput strong { font-weight: 600; }
@@ -82,45 +108,46 @@
   </style>
 </head>
 <body>
-  <div class="container">
-    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
-      <h1>Resume RAG</h1>
-      <form method="post" action="/logout" style="margin:0">
-        <button type="submit" style="background:none;color:#6c757d;border:none;padding:0;font-size:0.85rem;cursor:pointer;text-decoration:underline">Sign out</button>
-      </form>
-    </div>
-    <p class="subtitle">Upload resumes, then ask questions about them.</p>
+  <header class="topbar">
+    <h1>Resume RAG</h1>
+    <form method="post" action="/logout">
+      <button type="submit" class="btn-link">Sign out</button>
+    </form>
+  </header>
 
-    <div class="card">
-      <h2>1 — Upload resume</h2>
-      <div class="row">
-        <input type="file" id="fileInput" accept=".pdf" />
-        <button id="uploadBtn">Upload</button>
-      </div>
-      <div id="uploadTagRow" class="tag-row" style="margin-top:10px"></div>
-      <div class="status" id="uploadStatus"></div>
+  <div class="layout">
+    <div class="rail">
+      <section class="card">
+        <h2>Upload resume</h2>
+        <div class="row">
+          <input type="file" id="fileInput" accept=".pdf" />
+          <button id="uploadBtn">Upload</button>
+        </div>
+        <div id="uploadTagRow" class="tag-row"></div>
+        <div class="status" id="uploadStatus"></div>
+      </section>
+
+      <section class="card list-card">
+        <h2>Candidates</h2>
+        <div id="tagFilter" class="filter-bar"></div>
+        <div id="resumeList"></div>
+        <div class="status" id="deleteStatus"></div>
+      </section>
     </div>
 
-    <div class="card">
-      <h2>Uploaded resumes</h2>
-      <div id="tagFilter" class="filter-bar"></div>
-      <div id="resumeList"></div>
-      <div class="status" id="deleteStatus"></div>
-    </div>
-
-    <div class="card">
-      <h2>2 — Ask a question</h2>
-      <div style="position:relative;margin-bottom:8px">
-        <input type="text" id="resumeSearch" placeholder="Or search by name to drill into one resume…" autocomplete="off" />
+    <section class="card chat-card">
+      <h2>Ask a question</h2>
+      <div class="search-wrap">
+        <input type="text" id="resumeSearch" placeholder="Search by name" autocomplete="off" />
         <div id="resumeSuggestions"></div>
       </div>
-      <div id="scopeLabel" style="font-size:0.82rem;color:#6c757d;margin-bottom:10px">Asking about: all resumes</div>
+      <div id="scopeLabel">Asking about: all resumes</div>
       <div class="row">
-        <input type="text" id="messageInput" placeholder="e.g. What are their top skills?" />
+        <input type="text" id="messageInput" placeholder="Ask a question here" />
         <button id="sendBtn">Send</button>
       </div>
       <div id="chatOutput"></div>
-    </div>
+    </section>
   </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/18.1.3/lib/marked.umd.min.js"
