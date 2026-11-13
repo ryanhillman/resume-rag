@@ -3,17 +3,12 @@ name: Deploy
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 # The deploy runs on the VM itself, so no scope beyond reading the code.
 permissions:
   contents: read
-
-# A single-vCPU VM cannot build twice at once, and a half-finished deploy must
-# not be cancelled.
-concurrency:
-  group: deploy-production
-  cancel-in-progress: false
 
 jobs:
   check:
@@ -38,9 +33,15 @@ jobs:
     name: Deploy to VM
     runs-on: ubuntu-latest
     needs: [check]
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment: production
     timeout-minutes: 20
+    # A single-vCPU VM cannot build twice at once, and a half-finished deploy
+    # must not be cancelled. Scoped to this job so pull request checks never
+    # queue behind a deploy.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
     permissions:
       # No checkout here, so no contents scope. azure/login trades this
       # short-lived token for Azure credentials, which is why this workflow
