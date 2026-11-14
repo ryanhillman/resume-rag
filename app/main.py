@@ -806,11 +806,11 @@ async def _security_headers(request: Request, call_next):
 async def _model_call_failed(_request: Request, exc: requests.RequestException):
     """Only Azure is called with requests, so any failure here is a failed model call."""
     if isinstance(exc, requests.Timeout):
-        status, detail = 504, "The model took too long to respond. Please try again."
+        status, detail = 504, "The model took too long to respond."
     elif exc.response is not None and exc.response.status_code == 429:
-        status, detail = 503, "The model's rate limit was reached. Wait about a minute and ask again."
+        status, detail = 503, "The model's rate limit was reached."
     else:
-        status, detail = 502, "The model is unavailable. Please try again."
+        status, detail = 502, "The model is unavailable."
     log.warning("Model call failed: %r", exc)
     return JSONResponse(status_code=status, content={"detail": detail})
 
@@ -1013,7 +1013,7 @@ def chat(req: ChatRequest):
         return {"answer": "No relevant resume content found.", "sources": sources}
     answer = _call_llm(req.message, chunks, scope_note)
     if not answer or not answer.strip():
-        raise HTTPException(status_code=502, detail="Model returned an empty response. Please try again.")
+        raise HTTPException(status_code=502, detail="Model returned an empty response.")
     return {"answer": answer, "sources": sources}
 
 
