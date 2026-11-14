@@ -9,7 +9,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # The deploy builds the final stage, which skips this one.
 FROM base AS test
 COPY requirements-dev.txt .
-RUN pip install --no-cache-dir -r requirements-dev.txt
+RUN pip install --no-cache-dir -c requirements.txt -r requirements-dev.txt
 COPY . .
 
 FROM base
