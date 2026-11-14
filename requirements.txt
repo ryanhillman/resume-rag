@@ -48,7 +48,7 @@ pypdfium2==5.15.2
     # via pdfplumber
 python-multipart==0.0.33
     # via -r requirements.in
-requests==2.33.0
+requests==2.34.2
     # via -r requirements.in
 starlette==1.10.0
     # via fastapi
