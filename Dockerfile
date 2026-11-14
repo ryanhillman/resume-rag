@@ -1,9 +1,18 @@
-FROM python:3.15-slim
+FROM python:3.15-slim AS base
 
 WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# CI runs its checks in this stage, on the interpreter and packages that ship.
+# The deploy builds the final stage, which skips this one.
+FROM base AS test
+COPY requirements-dev.txt .
+RUN pip install --no-cache-dir -r requirements-dev.txt
+COPY . .
+
+FROM base
 
 COPY app/ .
 
