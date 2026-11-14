@@ -29,6 +29,7 @@ from fastapi import (
     Security,
     UploadFile,
 )
+from fastapi.responses import JSONResponse
 from fastapi.security.api_key import APIKeyHeader
 from pydantic import BaseModel, Field, StringConstraints, field_validator
 
@@ -799,6 +800,19 @@ async def _security_headers(request: Request, call_next):
     # which the origin check above rejects.
     response.headers["Referrer-Policy"] = "same-origin"
     return response
+
+
+@app.exception_handler(requests.RequestException)
+async def _model_call_failed(_request: Request, exc: requests.RequestException):
+    """Only Azure is called with requests, so any failure here is a failed model call."""
+    if isinstance(exc, requests.Timeout):
+        status, detail = 504, "The model took too long to respond. Please try again."
+    elif exc.response is not None and exc.response.status_code == 429:
+        status, detail = 503, "The model's rate limit was reached. Wait about a minute and ask again."
+    else:
+        status, detail = 502, "The model is unavailable. Please try again."
+    log.warning("Model call failed: %r", exc)
+    return JSONResponse(status_code=status, content={"detail": detail})
 
 
 # ── Ingest ─────────────────────────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+import requests
 
 
 def _fake_call_llm(names):
@@ -156,3 +157,41 @@ def test_chat_strips_the_question(client):
 
     assert res.status_code == 200
     assert captured["message"] == "who knows Postgres?"
+
+
+def _azure_response(status):
+    resp = requests.Response()
+    resp.status_code = status
+    return resp
+
+
+@pytest.mark.parametrize(
+    ("outcome", "status"),
+    [
+        (requests.Timeout(), 504),
+        (_azure_response(429), 503),
+        (_azure_response(500), 502),
+        (requests.ConnectionError(), 502),
+    ],
+)
+def test_failed_model_call_is_a_readable_error(client, outcome, status):
+    """A timeout or rate limit reaches the UI as a message, not a bare 500. The
+    question is embedded first, so this is the embedding call failing."""
+    # A one-item side_effect raises an exception and returns anything else.
+    with patch("app.main.requests.post", side_effect=[outcome]):
+        res = client.post("/chat", json={"message": "who knows Postgres?"})
+
+    assert res.status_code == status
+    assert res.json()["detail"].startswith("The model")
+
+
+def test_failed_completion_call_is_a_readable_error(client):
+    """An explicit scope skips the embedding, so this is the completion call failing."""
+    with (
+        patch("app.main._fetch_all_chunks", return_value=["chunk"]),
+        patch("app.main._get_candidates", return_value=[]),
+        patch("app.main.requests.post", side_effect=requests.Timeout()),
+    ):
+        res = client.post("/chat", json={"message": "compare these", "resume_ids": ["id-1"]})
+
+    assert res.status_code == 504
