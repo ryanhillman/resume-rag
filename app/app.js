@@ -4,6 +4,16 @@ async function apiFetch(url, opts = {}) {
   return res;
 }
 
+// FastAPI puts an error's message in "detail"; any other body is shown as sent.
+async function errorText(res) {
+  const body = await res.text();
+  try {
+    const { detail } = JSON.parse(body);
+    if (typeof detail === 'string') return detail;
+  } catch {}
+  return body;
+}
+
 // ── Tag state ──────────────────────────────────────────────────────────────────
 let ALL_TAGS = [];
 let activeFilters = new Set();
@@ -205,7 +215,7 @@ async function toggleTag(resumeId, chip) {
       body: JSON.stringify({tags: next}),
     });
     if (!res) return;
-    if (!res.ok) throw new Error(await res.text());
+    if (!res.ok) throw new Error(await errorText(res));
   } catch(e) {
     // Rollback
     resumeData[idx].tags = prev;
@@ -221,7 +231,7 @@ async function retryResume(resumeId, btn) {
   try {
     const res = await apiFetch(`/resumes/${resumeId}/retry`, {method: 'POST'});
     if (!res) return;
-    if (!res.ok) throw new Error(await res.text());
+    if (!res.ok) throw new Error(await errorText(res));
     const idx = resumeData.findIndex(r => r.resume_id === resumeId);
     if (idx !== -1) resumeData[idx].status = 'ingesting';
     statusEl.className = 'status';
@@ -239,7 +249,7 @@ async function downloadResume(resumeId, filename) {
   try {
     const res = await apiFetch(`/resumes/${resumeId}/file?download=true`);
     if (!res) return;
-    if (!res.ok) throw new Error(await res.text());
+    if (!res.ok) throw new Error(await errorText(res));
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -256,7 +266,7 @@ async function deleteResume(resumeId, btn) {
   try {
     const res = await apiFetch(`/resumes/${resumeId}`, {method: 'DELETE'});
     if (!res) return;
-    if (!res.ok) throw new Error(await res.text());
+    if (!res.ok) throw new Error(await errorText(res));
     status.className = 'status';
     status.textContent = 'Resume deleted.';
     await refreshResumes();
@@ -279,12 +289,7 @@ async function uploadFile() {
   try {
     const res = await apiFetch('/upload', {method: 'POST', body: formData});
     if (!res) return;
-    if (!res.ok) {
-      const bodyText = await res.text();
-      let detail;
-      try { detail = JSON.parse(bodyText)?.detail; } catch {}
-      throw new Error(detail ?? bodyText);
-    }
+    if (!res.ok) throw new Error(await errorText(res));
     const data = await res.json();
     status.textContent = `Ingesting ${data.filename}…`;
     uploadTags.clear();
@@ -401,7 +406,7 @@ async function sendMessage() {
       body: JSON.stringify(body),
     });
     if (!res) return;
-    if (!res.ok) throw new Error(await res.text());
+    if (!res.ok) throw new Error(await errorText(res));
     const data = await res.json();
     out.innerHTML = DOMPurify.sanitize(marked.parse(data.answer));
   } catch (e) {
