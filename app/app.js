@@ -60,7 +60,7 @@ function renderFilterBar() {
   bar.innerHTML = '';
   if (!ALL_TAGS.length) return;
   const label = document.createElement('span');
-  label.style.cssText = 'font-size:0.8rem;color:#6c757d;align-self:center;margin-right:2px';
+  label.className = 'filter-label';
   label.textContent = 'Filter:';
   bar.appendChild(label);
   for (const tag of ALL_TAGS) {
@@ -391,7 +391,7 @@ async function sendMessage() {
   const message = input.value.trim();
   if (!message) return;
   const out = document.getElementById('chatOutput');
-  out.innerHTML = '<em style="color:#6c757d">Thinking…</em>';
+  out.innerHTML = '<em class="chat-pending">Thinking…</em>';
   try {
     const body = { message };
     if (chatResumeId) {
@@ -409,10 +409,9 @@ async function sendMessage() {
     const data = await res.json();
     out.innerHTML = DOMPurify.sanitize(marked.parse(data.answer));
   } catch (e) {
-    const msg = document.createTextNode('Error: ' + e.message);
     const span = document.createElement('span');
-    span.style.color = '#dc3545';
-    span.appendChild(msg);
+    span.className = 'chat-error';
+    span.textContent = 'Error: ' + e.message;
     out.replaceChildren(span);
   }
 }
