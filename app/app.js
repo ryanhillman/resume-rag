@@ -143,9 +143,6 @@ function renderResumeList() {
     secondary.className = 'cand-file';
     secondary.textContent = [email, filename, formatUploaded(created_at)].filter(Boolean).join(' · ');
     nameSpan.append(primary, secondary);
-    const statusBadge = document.createElement('span');
-    statusBadge.className = `badge badge-${status}`;
-    statusBadge.textContent = status;
     const viewBtn = document.createElement('button');
     viewBtn.className = 'btn-sm btn-view';
     viewBtn.textContent = 'View';
@@ -160,7 +157,13 @@ function renderResumeList() {
     delBtn.addEventListener('click', () => deleteResume(resume_id, delBtn));
     const topRow = document.createElement('div');
     topRow.className = 'resume-row';
-    topRow.append(nameSpan, statusBadge);
+    topRow.append(nameSpan);
+    if (status !== 'ready') {
+      const statusBadge = document.createElement('span');
+      statusBadge.className = `badge badge-${status}`;
+      statusBadge.textContent = status;
+      topRow.appendChild(statusBadge);
+    }
     if (flags && flags.length) {
       const warnBadge = document.createElement('span');
       warnBadge.className = 'badge badge-inject';
