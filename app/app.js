@@ -133,7 +133,7 @@ function renderResumeList() {
     return;
   }
   for (const r of visible) {
-    const {resume_id, filename, status, flags, tags, candidate_name, email, created_at} = r;
+    const {resume_id, filename, status, flags, tags, candidate_name, email, phone, created_at} = r;
     const nameSpan = document.createElement('span');
     nameSpan.className = 'name';
     const primary = document.createElement('span');
@@ -141,7 +141,7 @@ function renderResumeList() {
     primary.textContent = candidate_name || filename;
     const secondary = document.createElement('span');
     secondary.className = 'cand-file';
-    secondary.textContent = [email, filename, formatUploaded(created_at)].filter(Boolean).join(' · ');
+    secondary.textContent = [email, phone, filename, formatUploaded(created_at)].filter(Boolean).join(' · ');
     nameSpan.append(primary, secondary);
     const viewBtn = document.createElement('button');
     viewBtn.className = 'btn-sm btn-view';
