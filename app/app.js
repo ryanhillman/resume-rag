@@ -58,6 +58,7 @@ async function loadTags() {
   renderFilterBar();
   renderUploadTags();
   renderScopeLabel();
+  if (resumeData.length) renderResumeList();
 }
 
 function renderUploadTags() {
