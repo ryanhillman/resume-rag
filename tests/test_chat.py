@@ -95,8 +95,7 @@ def test_unfiltered_rank_question_gets_full_roster(client):
     for name in names:
         assert name in captured["roster"]
     assert "50 candidates in scope" in captured["scope_note"]
-    # The roster lets the answer rank candidates whose chunks were never sent,
-    # so every ready candidate is cited, not just the retrieved one.
+    # The roster can name anyone, so every ready candidate is cited.
     assert mock_cands.call_args[0][0] is None
 
 

@@ -60,9 +60,7 @@ def test_rate_limit_after_max_failures(bare_client):
 
 
 def test_lockout_blocks_even_a_correct_password(bare_client):
-    """The lockout must gate the password check. If a correct password were still
-    honored while locked out, an attacker's eventual right guess would be let
-    through and the lockout would throttle nothing."""
+    """A correct password must not get in during a lockout, or the lockout throttles nothing."""
     from app.main import LOGIN_MAX_FAILURES
 
     for _ in range(LOGIN_MAX_FAILURES):
@@ -186,8 +184,7 @@ def test_security_headers_on_every_response(client, bare_client):
     assert res.headers["X-Frame-Options"] == "DENY"
     assert "default-src 'self'" in res.headers["Content-Security-Policy"]
 
-    # Including a response the origin check rejects, which it only does because
-    # the header pass is registered after it and so wraps it.
+    # Also on a response the origin check rejects: the header pass wraps it.
     blocked = bare_client.post(
         "/login",
         data={"password": "test-password"},

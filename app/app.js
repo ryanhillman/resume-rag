@@ -4,7 +4,7 @@ async function apiFetch(url, opts = {}) {
   return res;
 }
 
-// FastAPI puts an error's message in "detail"; any other body is shown as sent.
+// FastAPI puts an error's message in "detail".
 async function errorText(res) {
   const body = await res.text();
   try {
@@ -14,7 +14,6 @@ async function errorText(res) {
   return body;
 }
 
-// ── Tag state ──────────────────────────────────────────────────────────────────
 let ALL_TAGS = [];
 let activeFilters = new Set();
 let candidateQuery = '';
@@ -216,7 +215,6 @@ async function toggleTag(resumeId, chip) {
     if (!res) return;
     if (!res.ok) throw new Error(await errorText(res));
   } catch(e) {
-    // Rollback
     resumeData[idx].tags = prev;
     renderResumeList();
     renderScopeLabel();
