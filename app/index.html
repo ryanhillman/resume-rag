@@ -24,8 +24,7 @@
     .list-card { flex: 1; }
     @media (max-width: 860px) {
       body { display: block; height: auto; overflow: visible; }
-      .layout { grid-template-columns: 1fr; }
-      #resumeList { overflow: visible; }
+      .layout { grid-template-columns: minmax(0, 1fr); }
     }
     h1 { font-size: 1.5rem; font-weight: 600; }
     .card { background: #fff; border: 1px solid #dee2e6; border-radius: 8px; padding: 16px; }
