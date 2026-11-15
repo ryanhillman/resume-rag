@@ -1,9 +1,4 @@
-# Remote state in Azure Blob Storage.
-#
-# The storage account has blob versioning and 30-day soft delete enabled, so a
-# corrupted or truncated state file can be rolled back. Authentication uses
-# your az CLI login; no credentials live in this file.
-#
+# State lives in Azure Blob Storage, authenticated by your az CLI login.
 # After cloning, run:  terraform -chdir=infra init
 
 terraform {

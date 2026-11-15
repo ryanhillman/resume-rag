@@ -12,9 +12,8 @@
       display: flex; flex-direction: column; height: 100vh; overflow: hidden;
     }
     .topbar { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
-    /* minmax(0, …) on both tracks: a long filename or the file input would
-       otherwise widen a column past its share. min-height: 0 on every flex
-       ancestor of a scroll area, or the area grows instead of scrolling. */
+    /* minmax(0, …) stops long content widening a column. min-height: 0 on each
+       flex ancestor makes the list scroll instead of grow. */
     .layout {
       display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 12px; flex: 1; min-height: 0;

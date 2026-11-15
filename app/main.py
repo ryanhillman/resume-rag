@@ -55,7 +55,7 @@ AZURE_V1_URL = f"{AZURE_OPENAI_ENDPOINT}/openai/v1"
 
 CHUNK_SIZE = 600
 CHUNK_OVERLAP = 80
-MAX_UPLOAD_BYTES = 5_000_000  # 5 MB — generous for a 1-page resume
+MAX_UPLOAD_BYTES = 5_000_000
 TOP_K_PER_CANDIDATE = 2  # chunks per candidate for unfiltered questions
 MAX_POOL_CANDIDATES = 40  # similarity-ranked candidates for unfiltered questions
 ROSTER_PREVIEW_CHARS = 120  # of each candidate's text, stored and shown
@@ -150,7 +150,7 @@ WEAK_PASSWORDS: frozenset[str] = frozenset(
 )
 MIN_PASSWORD_LEN = 12
 
-# Per-IP failed login tracking: ip → list of failure timestamps
+# ip → failure timestamps
 LOGIN_ATTEMPTS: dict[str, list[float]] = {}
 LOGIN_MAX_FAILURES = 5
 LOGIN_LOCKOUT_SECS = 900  # 15 minutes
@@ -158,8 +158,7 @@ SESSION_TTL_SECS = 8 * 3600
 
 
 def _login_ip(request: Request) -> str:
-    # Caddy sets this to the client's address. Take the last entry: it is the
-    # one the nearest proxy added, so it is the only one not client-supplied.
+    # The last entry is the one Caddy added, so the only one the client cannot forge.
     forwarded = request.headers.get("x-forwarded-for", "")
     return forwarded.split(",")[-1].strip() or (request.client.host if request.client else "unknown")
 
@@ -518,8 +517,7 @@ PHONE_RE = re.compile(r"\+?\d{0,2}[\s.()-]{0,2}\d{3}[\s.()-]{0,2}\d{3}[\s.-]?\d{
 
 
 def _extract_contact(text: str, filename: str) -> tuple[str, Optional[str], Optional[str]]:
-    """Name, email, phone by regex. Name falls back to the
-    filename; staff can correct all three via PATCH /resumes/{id}."""
+    """Name, email and phone by regex; the name falls back to the filename."""
     name = ""
     for line in text.splitlines()[:10]:
         if NAME_RE.match(line.strip()):
@@ -536,12 +534,8 @@ def _extract_contact(text: str, filename: str) -> tuple[str, Optional[str], Opti
 
 
 def _chunk_text(text: str) -> list[str]:
-    """Split text into overlapping chunks at natural boundaries.
-
-    Units are kept at or under CHUNK_SIZE where the text allows it, so the
-    buffering loop never truncates. A single word longer than CHUNK_SIZE is
-    passed through whole rather than cut mid-word.
-    """
+    """Split text into overlapping chunks at paragraph, sentence, then word
+    boundaries. A word longer than CHUNK_SIZE stays whole."""
     units: list[str] = []
 
     def _add_unit(s: str) -> None:
@@ -605,8 +599,7 @@ def _embed_texts(texts: list[str]) -> list[list[float]]:
 
 
 def _write_chunks(resume_id: str, chunks: list[str], embeddings: list[list[float]]) -> None:
-    """Replace this resume's chunks. Deleting first keeps a retry from leaving
-    the previous attempt's chunks behind alongside the new ones."""
+    """Replace this resume's chunks, so a retry leaves none from the previous attempt."""
     with _pg() as conn:
         with conn.cursor() as cur:
             cur.execute("DELETE FROM resume_chunks WHERE resume_id = %s", (resume_id,))
@@ -643,9 +636,8 @@ def _fetch_all_chunks(resume_ids: list[str]) -> list[str]:
 
 
 def _retrieve_chunks(query_embedding: list[float]) -> tuple[list[str], list[str]]:
-    """Unfiltered questions: top TOP_K_PER_CANDIDATE chunks for each of the
-    MAX_POOL_CANDIDATES candidates nearest the question. Returns the chunks and
-    the resume_ids they came from, so the answer cites what the model read."""
+    """Unfiltered questions: the top TOP_K_PER_CANDIDATE chunks from each of the
+    MAX_POOL_CANDIDATES nearest candidates, and the resume_ids they came from."""
     vec = "[" + ",".join(str(x) for x in query_embedding) + "]"
     with _pg() as conn:
         with conn.cursor() as cur:
@@ -765,10 +757,9 @@ CSRF_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 @app.middleware("http")
 async def _csrf_check(request: Request, call_next):
-    # SameSite=Strict doesn't cover *.cloudapp.azure.com siblings: azure.com is
-    # the eTLD+1, so the browser treats them as same-site. Hence the Origin check.
-    # It only matters for cookie auth — a cross-site page can't attach the
-    # X-API-Key header — so a valid key skips it.
+    # SameSite=Strict treats *.cloudapp.azure.com siblings as same-site, because
+    # azure.com is the eTLD+1; hence the Origin check. A valid API key skips it:
+    # a cross-site page cannot attach that header.
     key = request.headers.get("x-api-key", "")
     if key and secrets.compare_digest(key, API_KEY):
         return await call_next(request)
@@ -786,15 +777,14 @@ async def _csrf_check(request: Request, call_next):
     return await call_next(request)
 
 
-# Registered after the origin check, so it runs outside it: Starlette runs the
-# last middleware added as the outermost, which puts these headers on a 403 too.
+# Registered last, so it runs outermost and its headers reach the 403 above too.
 @app.middleware("http")
 async def _security_headers(request: Request, call_next):
     response = await call_next(request)
     response.headers["Content-Security-Policy"] = CSP
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
-    # Caddy terminates TLS but does not send HSTS of its own accord.
+    # Caddy terminates TLS but does not send HSTS.
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     # Not no-referrer: that makes browsers send Origin: null on form posts,
     # which the origin check above rejects.
@@ -831,7 +821,6 @@ def _ingest(resume_id: str, filename: str, text: str):
 
 
 def _retry_ingest(resume_id: str, filename: str, content: bytes):
-    """Re-extract text from the stored PDF, then re-run ingest."""
     try:
         text, _flags, _pages = _extract_visible_text(content)
     except Exception:
@@ -868,10 +857,8 @@ def serve_app_js():
 @app.post("/login")
 def login(request: Request, password: str = Form(...)):
     ip = _login_ip(request)
-    # Must precede the password check: honoring a correct password while locked
-    # out would let an attacker's eventual right guess through, throttling nothing.
-    # Returning here also records no new failure, so the window can't be extended
-    # indefinitely to hold a legitimate office out.
+    # Before the password check, or a right guess would still get in during a
+    # lockout. No failure is recorded here, so retries cannot extend it.
     if _is_rate_limited(ip):
         return Response(
             content="Too many failed attempts. Try again later.",
@@ -914,7 +901,6 @@ def upload(
             status_code=400,
             detail=f"Unsupported file type '{ext}'. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
         )
-    # Before reading or parsing anything: a bad tag list is cheap to reject.
     tag_list = _parse_tags(tags)
     content = file.file.read()
     if len(content) > MAX_UPLOAD_BYTES:
@@ -992,7 +978,6 @@ def chat(req: ChatRequest):
 
     scope_note = ""
     if scope_ids is not None:
-        # Explicit scope: every candidate's chunks, no ranking or cap.
         chunks = _fetch_all_chunks(scope_ids)
         cited_ids = scope_ids
     else:
@@ -1003,8 +988,7 @@ def chat(req: ChatRequest):
             if roster:
                 chunks = [roster, *chunks]
                 scope_note = f"There are {count} candidates in scope; the roster lists all of them."
-                # The roster names everyone, so the answer can rank a candidate
-                # whose chunks were never sent. Cite all of them.
+                # The roster can name anyone, so cite every candidate.
                 cited_ids = None
 
     # None means every ready candidate.
