@@ -31,34 +31,7 @@ async function loadTags() {
   try {
     const res = await fetch('/tags');
     ALL_TAGS = (await res.json()).tags;
-  } catch(e) {
-    ALL_TAGS = [
-      {name:"Java",bg:"#fed7aa",text:"#7c2d12"},
-      {name:"Python",bg:"#bfdbfe",text:"#1e3a8a"},
-      {name:"JavaScript",bg:"#fef08a",text:"#854d0e"},
-      {name:"SQL",bg:"#fbcfe8",text:"#831843"},
-      {name:"Mobile",bg:"#e0e7ff",text:"#3730a3"},
-      {name:"C#",bg:"#c7d2fe",text:"#3730a3"},
-      {name:"R",bg:"#fce7f3",text:"#9d174d"},
-      {name:"ML",bg:"#dbeafe",text:"#1e40af"},
-      {name:"Kubernetes",bg:"#e0f2fe",text:"#0369a1"},
-      {name:"Gen AI",bg:"#fae8ff",text:"#701a75"},
-      {name:"LLMs",bg:"#ede9fe",text:"#5b21b6"},
-      {name:"RAG",bg:"#a7f3d0",text:"#065f46"},
-      {name:"AWS",bg:"#ffedd5",text:"#c2410c"},
-      {name:"GCP",bg:"#d1fae5",text:"#166534"},
-      {name:"Azure",bg:"#bae6fd",text:"#0369a1"},
-      {name:"Oracle",bg:"#fca5a5",text:"#7f1d1d"},
-      {name:"Data",bg:"#99f6e4",text:"#134e4a"},
-      {name:"IaC",bg:"#f1f5f9",text:"#334155"},
-      {name:"DevOps",bg:"#cbd5e1",text:"#1e293b"},
-      {name:"Networks",bg:"#c7d2fe",text:"#312e81"},
-      {name:"Security",bg:"#fecaca",text:"#7f1d1d"},
-      {name:"Management",bg:"#fde68a",text:"#78350f"},
-      {name:"Senior",bg:"#bbf7d0",text:"#14532d"},
-      {name:"Junior",bg:"#d9f99d",text:"#365314"},
-    ];
-  }
+  } catch(e) { console.error('Could not load tags', e); }
   renderFilterBar();
   renderUploadTags();
   renderScopeLabel();
