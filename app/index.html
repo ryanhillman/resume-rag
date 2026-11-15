@@ -8,18 +8,18 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #f8f9fa; color: #212529; padding: 32px 28px;
+      background: #f8f9fa; color: #212529; padding: 16px 20px;
       display: flex; flex-direction: column; height: 100vh; overflow: hidden;
     }
-    .topbar { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 20px; }
+    .topbar { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
     /* minmax(0, …) on both tracks: a long filename or the file input would
        otherwise widen a column past its share. min-height: 0 on every flex
        ancestor of a scroll area, or the area grows instead of scrolling. */
     .layout {
       display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 20px; flex: 1; min-height: 0;
+      gap: 12px; flex: 1; min-height: 0;
     }
-    .rail { display: flex; flex-direction: column; gap: 20px; min-height: 0; }
+    .rail { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
     .list-card, .chat-card { display: flex; flex-direction: column; min-height: 0; }
     .list-card { flex: 1; }
     @media (max-width: 860px) {
@@ -28,8 +28,8 @@
       #resumeList { overflow: visible; }
     }
     h1 { font-size: 1.5rem; font-weight: 600; }
-    .card { background: #fff; border: 1px solid #dee2e6; border-radius: 8px; padding: 24px; }
-    h2 { font-size: 1rem; font-weight: 600; margin-bottom: 14px; color: #495057; }
+    .card { background: #fff; border: 1px solid #dee2e6; border-radius: 8px; padding: 16px; }
+    h2 { font-size: 1rem; font-weight: 600; margin-bottom: 8px; color: #495057; }
     .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     input[type="file"] { flex: 1; min-width: 0; font-size: 0.9rem; }
     input[type="text"] {
@@ -48,6 +48,7 @@
     .btn-link:hover { background: none; color: #212529; }
     .status { margin-top: 10px; font-size: 0.88rem; color: #6c757d; min-height: 20px; }
     .status.error { color: #dc3545; }
+    .status:empty { display: none; }
     #candidateSearch { flex: none; width: 100%; margin-bottom: 10px; }
     .empty { color: #6c757d; font-size: 0.88rem; }
     .resume-row { display: flex; align-items: center; justify-content: space-between; font-size: 0.9rem; gap: 4px; }
@@ -79,10 +80,10 @@
       background: none; border: 1px dashed #adb5bd; color: #6c757d;
     }
     .tag-edit:hover { background: #e9ecef; color: #495057; }
-    .filter-bar { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px; align-items: center; }
+    .filter-bar { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; align-items: center; }
     .filter-chip {
-      display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 10px;
-      font-size: 0.78rem; font-weight: 500; cursor: pointer; border: 1.5px solid transparent;
+      display: inline-flex; align-items: center; padding: 1px 7px; border-radius: 10px;
+      font-size: 0.72rem; font-weight: 500; cursor: pointer; border: 1.5px solid transparent;
       transition: opacity 0.12s, border-color 0.12s; white-space: nowrap; user-select: none;
     }
     .filter-chip.off { opacity: 0.35; }
