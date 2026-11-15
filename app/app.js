@@ -20,6 +20,7 @@ let activeFilters = new Set();
 let candidateQuery = '';
 let uploadTags = new Set();
 let resumeData = [];
+let editingTagsId = null;
 let chatResumeId = null;
 let chatResumeName = null;
 
@@ -176,25 +177,32 @@ function renderResumeList() {
       topRow.append(retryBtn);
     }
     topRow.append(viewBtn, dlBtn, delBtn);
-    // Only the tags this candidate carries; click one to remove it.
+    const editing = editingTagsId === resume_id;
     const tagRow = document.createElement('div');
     tagRow.className = 'tag-row';
-    for (const tagName of tags || []) {
-      const tag = ALL_TAGS.find(t => t.name === tagName);
-      if (!tag) continue;
+    for (const tag of ALL_TAGS) {
+      const on = (tags || []).includes(tag.name);
+      if (!on && !editing) continue;
       const chip = document.createElement('button');
-      chip.className = 'tag-chip';
+      chip.className = 'tag-chip' + (on ? '' : ' off');
       chip.style.cssText = `background:${tag.bg};color:${tag.text}`;
       chip.textContent = tag.name;
       chip.dataset.tag = tag.name;
-      chip.title = `Remove ${tag.name}`;
+      chip.title = `${on ? 'Remove' : 'Add'} ${tag.name}`;
       chip.addEventListener('click', () => toggleTag(resume_id, chip));
       tagRow.appendChild(chip);
     }
+    const editBtn = document.createElement('button');
+    editBtn.className = 'tag-edit';
+    editBtn.textContent = editing ? 'Done' : 'Edit';
+    editBtn.addEventListener('click', () => {
+      editingTagsId = editing ? null : resume_id;
+      renderResumeList();
+    });
+    tagRow.appendChild(editBtn);
     const card = document.createElement('div');
     card.className = 'resume-card';
-    card.append(topRow);
-    if (tagRow.children.length) card.append(tagRow);
+    card.append(topRow, tagRow);
     list.appendChild(card);
   }
 }
@@ -205,7 +213,6 @@ async function toggleTag(resumeId, chip) {
   if (idx === -1) return;
   const prev = resumeData[idx].tags || [];
   const next = prev.includes(tagName) ? prev.filter(t => t !== tagName) : [...prev, tagName];
-  // Optimistic update; the chip has to leave the row, so re-render it.
   resumeData[idx].tags = next;
   renderResumeList();
   renderScopeLabel();
