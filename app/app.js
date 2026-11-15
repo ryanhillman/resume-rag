@@ -21,8 +21,11 @@ let candidateQuery = '';
 let uploadTags = new Set();
 let resumeData = [];
 let editingTagsId = null;
+let confirmingDeleteId = null;
 let chatResumeId = null;
 let chatResumeName = null;
+
+const DELETE_CONFIRM_MS = 4000;
 
 async function loadTags() {
   try {
@@ -155,7 +158,23 @@ function renderResumeList() {
     const viewBtn = iconButton('view', '↗', 'View', () =>
       window.open(`/resumes/${resume_id}/file`, '_blank', 'noopener'));
     const dlBtn = iconButton('download', '↓', 'Download', () => downloadResume(resume_id, filename));
-    const delBtn = iconButton('delete', '✕', 'Delete', btn => deleteResume(resume_id, btn));
+    const confirming = confirmingDeleteId === resume_id;
+    const delBtn = iconButton(
+      'delete',
+      confirming ? 'Delete?' : '✕',
+      confirming ? 'Click again to delete' : 'Delete',
+      btn => {
+        if (confirming) return deleteResume(resume_id, btn);
+        confirmingDeleteId = resume_id;
+        renderResumeList();
+        setTimeout(() => {
+          if (confirmingDeleteId !== resume_id) return;
+          confirmingDeleteId = null;
+          renderResumeList();
+        }, DELETE_CONFIRM_MS);
+      },
+    );
+    delBtn.classList.toggle('confirm', confirming);
     const topRow = document.createElement('div');
     topRow.className = 'resume-row';
     topRow.append(nameSpan);
