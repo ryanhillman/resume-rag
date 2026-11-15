@@ -118,6 +118,15 @@ function formatUploaded(ts) {
   return isNaN(d) ? '' : d.toLocaleDateString(undefined, {year: 'numeric', month: 'short', day: 'numeric'});
 }
 
+function iconButton(kind, icon, label, onClick) {
+  const btn = document.createElement('button');
+  btn.className = `btn-sm btn-${kind}`;
+  btn.textContent = icon;
+  btn.title = label;
+  btn.addEventListener('click', () => onClick(btn));
+  return btn;
+}
+
 function renderResumeList() {
   const list = document.getElementById('resumeList');
   list.innerHTML = '';
@@ -143,18 +152,10 @@ function renderResumeList() {
     secondary.className = 'cand-file';
     secondary.textContent = [email, phone, filename, formatUploaded(created_at)].filter(Boolean).join(' · ');
     nameSpan.append(primary, secondary);
-    const viewBtn = document.createElement('button');
-    viewBtn.className = 'btn-sm btn-view';
-    viewBtn.textContent = 'View';
-    viewBtn.addEventListener('click', () => window.open(`/resumes/${resume_id}/file`, '_blank', 'noopener'));
-    const dlBtn = document.createElement('button');
-    dlBtn.className = 'btn-sm btn-download';
-    dlBtn.textContent = 'Download';
-    dlBtn.addEventListener('click', () => downloadResume(resume_id, filename));
-    const delBtn = document.createElement('button');
-    delBtn.className = 'btn-sm btn-delete';
-    delBtn.textContent = 'Delete';
-    delBtn.addEventListener('click', () => deleteResume(resume_id, delBtn));
+    const viewBtn = iconButton('view', '↗', 'View', () =>
+      window.open(`/resumes/${resume_id}/file`, '_blank', 'noopener'));
+    const dlBtn = iconButton('download', '↓', 'Download', () => downloadResume(resume_id, filename));
+    const delBtn = iconButton('delete', '✕', 'Delete', btn => deleteResume(resume_id, btn));
     const topRow = document.createElement('div');
     topRow.className = 'resume-row';
     topRow.append(nameSpan);
@@ -168,16 +169,11 @@ function renderResumeList() {
       const warnBadge = document.createElement('span');
       warnBadge.className = 'badge badge-inject';
       warnBadge.title = 'Possible injection detected: ' + flags.join(', ');
-      warnBadge.textContent = '⚠ injection risk';
+      warnBadge.textContent = '⚠';
       topRow.appendChild(warnBadge);
     }
     if (status === 'failed') {
-      const retryBtn = document.createElement('button');
-      retryBtn.className = 'btn-sm btn-retry';
-      retryBtn.textContent = 'Retry';
-      retryBtn.title = 'Run the ingest again from the stored PDF';
-      retryBtn.addEventListener('click', () => retryResume(resume_id, retryBtn));
-      topRow.append(retryBtn);
+      topRow.append(iconButton('retry', '↻', 'Retry', btn => retryResume(resume_id, btn)));
     }
     topRow.append(viewBtn, dlBtn, delBtn);
     const editing = editingTagsId === resume_id;
