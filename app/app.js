@@ -434,7 +434,13 @@ async function sendMessage() {
   if (btn.disabled) return;
   const out = document.getElementById('chatOutput');
   btn.disabled = true;
-  out.innerHTML = '<em class="chat-pending">Thinking…</em>';
+  const asked = document.createElement('p');
+  asked.className = 'chat-q';
+  asked.textContent = message;
+  const pending = document.createElement('em');
+  pending.className = 'chat-pending';
+  pending.textContent = 'Thinking…';
+  out.replaceChildren(asked, pending);
   try {
     const body = { message };
     if (chatResumeId) {
@@ -450,12 +456,16 @@ async function sendMessage() {
     if (!res) return;
     if (!res.ok) throw new Error(await errorText(res));
     const data = await res.json();
-    out.innerHTML = DOMPurify.sanitize(marked.parse(data.answer));
+    const answer = document.createElement('div');
+    answer.className = 'chat-a';
+    answer.innerHTML = DOMPurify.sanitize(marked.parse(data.answer));
+    out.replaceChildren(asked, answer);
+    input.value = '';
   } catch (e) {
     const span = document.createElement('span');
     span.className = 'chat-error';
     span.textContent = 'Error: ' + e.message;
-    out.replaceChildren(span);
+    out.replaceChildren(asked, span);
   } finally {
     btn.disabled = false;
   }
