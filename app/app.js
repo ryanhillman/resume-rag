@@ -106,10 +106,13 @@ function renderResumeList() {
   const list = document.getElementById('resumeList');
   list.innerHTML = '';
   const q = candidateQuery.trim().toLowerCase();
+  // A query made only of phone characters also matches on digits, whatever the stored format.
+  const qDigits = /^[\d\s().+-]+$/.test(q) ? q.replace(/\D/g, '') : '';
   const visible = resumeData.filter(r => {
     if (activeFilters.size && ![...activeFilters].every(t => (r.tags || []).includes(t))) return false;
     if (!q) return true;
-    return [r.candidate_name, r.email, r.filename].some(v => (v || '').toLowerCase().includes(q));
+    if (qDigits && (r.phone || '').replace(/\D/g, '').includes(qDigits)) return true;
+    return [r.candidate_name, r.email, r.filename, r.phone].some(v => (v || '').toLowerCase().includes(q));
   });
   if (!visible.length) {
     list.innerHTML = '<p class="empty">' +
