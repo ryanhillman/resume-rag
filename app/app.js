@@ -280,7 +280,9 @@ async function deleteResume(resumeId, btn) {
 async function uploadFile() {
   const input = document.getElementById('fileInput');
   if (!input.files.length) return;
+  const btn = document.getElementById('uploadBtn');
   const status = document.getElementById('uploadStatus');
+  btn.disabled = true;
   status.className = 'status';
   status.textContent = 'Uploading…';
   const formData = new FormData();
@@ -292,6 +294,7 @@ async function uploadFile() {
     if (!res.ok) throw new Error(await errorText(res));
     const data = await res.json();
     status.textContent = `Ingesting ${data.filename}…`;
+    input.value = '';
     uploadTags.clear();
     renderUploadTags();
     await refreshResumes();
@@ -299,6 +302,8 @@ async function uploadFile() {
   } catch (e) {
     status.className = 'status error';
     status.textContent = e.message;
+  } finally {
+    btn.disabled = false;
   }
 }
 
@@ -310,6 +315,7 @@ async function pollIngest(resumeId, statusEl) {
       if (!res) return;
       const data = await res.json();
       if (data.status === 'ready') {
+        statusEl.className = 'status';
         statusEl.textContent = `${data.filename} ready.`;
         await refreshResumes();
         return;
@@ -391,7 +397,10 @@ async function sendMessage() {
   const input = document.getElementById('messageInput');
   const message = input.value.trim();
   if (!message) return;
+  const btn = document.getElementById('sendBtn');
+  if (btn.disabled) return;
   const out = document.getElementById('chatOutput');
+  btn.disabled = true;
   out.innerHTML = '<em class="chat-pending">Thinking…</em>';
   try {
     const body = { message };
@@ -414,6 +423,8 @@ async function sendMessage() {
     span.className = 'chat-error';
     span.textContent = 'Error: ' + e.message;
     out.replaceChildren(span);
+  } finally {
+    btn.disabled = false;
   }
 }
 
