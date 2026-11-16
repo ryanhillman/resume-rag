@@ -181,7 +181,7 @@ function renderResumeList() {
     topRow.append(viewBtn, dlBtn, delBtn);
     const editing = editingTagsId === resume_id;
     const tagRow = document.createElement('div');
-    tagRow.className = 'tag-row';
+    tagRow.className = 'tag-row' + (editing ? ' picker' : '');
     for (const tag of ALL_TAGS) {
       const on = (tags || []).includes(tag.name);
       if (!on && !editing) continue;
