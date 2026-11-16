@@ -144,7 +144,7 @@
     .resume-card:hover { background: #fff; box-shadow: 0 6px 16px -8px rgba(22, 28, 70, 0.45); }
     .tag-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 5px; }
     #uploadTagRow { margin-top: 10px; }
-    #tagFilter { margin: 0 0 8px; }
+    #tagFilter, #chatTagRow { margin: 0 0 8px; }
     .tag-chip {
       display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 10px;
       font-size: var(--text-xs); font-weight: 550; cursor: pointer; border: none; outline: none;
@@ -239,6 +239,7 @@
         <input type="text" id="resumeSearch" placeholder="Type a name to ask about a candidate" autocomplete="off" />
         <div id="resumeSuggestions"></div>
       </div>
+      <div id="chatTagRow" class="tag-row picker"></div>
       <div id="scopeLabel">Asking about: all candidates</div>
       <div class="row">
         <input type="text" id="messageInput" placeholder="What would you like to know?" />

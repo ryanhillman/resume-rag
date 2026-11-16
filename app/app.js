@@ -18,6 +18,7 @@ let ALL_TAGS = [];
 let activeFilters = new Set();
 let candidateQuery = '';
 let uploadTags = new Set();
+let chatTags = new Set();
 let resumeData = [];
 let editingTagsId = null;
 let confirmingDeleteId = null;
@@ -37,6 +38,7 @@ async function loadTags() {
   } catch(e) { console.error('Could not load tags', e); }
   renderFilterBar();
   renderUploadTags();
+  renderChatTags();
   renderScopeLabel();
   if (resumeData.length) renderResumeList();
 }
@@ -71,9 +73,14 @@ function renderUploadTags() {
 }
 
 function renderFilterBar() {
-  renderTagPicker('tagFilter', 'Filter', activeFilters, () => {
-    renderResumeList();
-    renderScopeLabel();
+  renderTagPicker('tagFilter', 'Filter', activeFilters, renderResumeList);
+}
+
+// A question goes to one candidate or to tags, never both: picking a tag drops the candidate.
+function renderChatTags() {
+  renderTagPicker('chatTagRow', 'Tags', chatTags, () => {
+    if (chatResumeId) clearChatCandidate();
+    else renderScopeLabel();
   });
 }
 
@@ -355,32 +362,38 @@ function renderScopeLabel() {
   const label = document.getElementById('scopeLabel');
   if (!label) return;
   label.innerHTML = '';
-  const clearBtn = () => {
+  const clearBtn = onClick => {
     const btn = document.createElement('span');
     btn.className = 'scope-clear';
     btn.textContent = '✕ clear';
-    btn.addEventListener('click', clearChatScope);
+    btn.addEventListener('click', onClick);
     return btn;
   };
   if (chatResumeId) {
     const strong = document.createElement('strong');
     strong.textContent = chatResumeName;
-    label.append('Asking about: ', strong, ' ', clearBtn());
-  } else if (activeFilters.size) {
-    const count = resumeData.filter(r => r.status === 'ready' && hasAllTags(r, activeFilters)).length;
+    label.append('Asking about: ', strong, ' ', clearBtn(clearChatCandidate));
+  } else if (chatTags.size) {
+    const count = resumeData.filter(r => r.status === 'ready' && hasAllTags(r, chatTags)).length;
     const strong = document.createElement('strong');
     strong.textContent = `${count} candidate${count !== 1 ? 's' : ''}`;
-    label.append('Asking about: ', strong, ' matching filter ', clearBtn());
+    label.append('Asking about: ', strong, ' ', clearBtn(clearChatTags));
   } else {
     label.textContent = 'Asking about: all candidates';
   }
 }
 
-function clearChatScope() {
+function clearChatCandidate() {
   chatResumeId = null;
   chatResumeName = null;
   document.getElementById('resumeSearch').value = '';
   document.getElementById('resumeSuggestions').style.display = 'none';
+  renderScopeLabel();
+}
+
+function clearChatTags() {
+  chatTags.clear();
+  renderChatTags();
   renderScopeLabel();
 }
 
@@ -402,6 +415,8 @@ function showResumeSuggestions(query) {
     item.addEventListener('click', () => {
       chatResumeId = r.resume_id;
       chatResumeName = label;
+      chatTags.clear();
+      renderChatTags();
       document.getElementById('resumeSearch').value = label;
       box.style.display = 'none';
       renderScopeLabel();
@@ -424,8 +439,8 @@ async function sendMessage() {
     const body = { message };
     if (chatResumeId) {
       body.resume_id = chatResumeId;
-    } else if (activeFilters.size) {
-      body.tags = [...activeFilters];
+    } else if (chatTags.size) {
+      body.tags = [...chatTags];
     }
     const res = await apiFetch('/chat', {
       method: 'POST',
