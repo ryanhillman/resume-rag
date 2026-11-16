@@ -67,6 +67,7 @@ ALLOWED_EXTENSIONS = {".pdf"}
 INDEX_HTML = pathlib.Path(__file__).parent / "index.html"
 LOGIN_HTML = pathlib.Path(__file__).parent / "login.html"
 APP_JS = pathlib.Path(__file__).parent / "app.js"
+FONT = pathlib.Path(__file__).parent / "fonts" / "figtree.woff2"
 
 SYSTEM_PROMPT = (
     "You are a helpful assistant for a staffing agency. "
@@ -852,6 +853,15 @@ def index(rag_session: Optional[str] = Cookie(None)):
 @app.get("/app.js")
 def serve_app_js():
     return Response(content=APP_JS.read_text(encoding="utf-8"), media_type="application/javascript")
+
+
+@app.get("/fonts/figtree.woff2")
+def serve_font():
+    return Response(
+        content=FONT.read_bytes(),
+        media_type="font/woff2",
+        headers={"Cache-Control": "public, max-age=604800"},
+    )
 
 
 @app.post("/login")
