@@ -20,7 +20,7 @@ let candidateQuery = '';
 let uploadTags = new Set();
 let chatTags = new Set();
 let resumeData = [];
-let editingTagsId = null;
+let editingId = null;
 let confirmingDeleteId = null;
 let chatResumeId = null;
 let chatResumeName = null;
@@ -161,11 +161,24 @@ function renderResumeList() {
   }
   for (const r of visible) {
     const {resume_id, filename, status, flags, tags, candidate_name, email, phone, created_at} = r;
+    const editing = editingId === resume_id;
     const nameSpan = document.createElement('span');
     nameSpan.className = 'name';
-    const primary = document.createElement('span');
+    const primary = document.createElement(editing ? 'input' : 'span');
     primary.className = 'cand-name';
-    primary.textContent = candidate_name || filename;
+    if (editing) {
+      primary.type = 'text';
+      primary.value = candidate_name || '';
+      primary.maxLength = 200;
+      primary.placeholder = 'Candidate name';
+      primary.addEventListener('change', () => renameCandidate(r, primary));
+      primary.addEventListener('keydown', e => {
+        if (e.key === 'Escape') primary.value = r.candidate_name || '';
+        if (e.key === 'Enter' || e.key === 'Escape') primary.blur();
+      });
+    } else {
+      primary.textContent = candidate_name || filename;
+    }
     const secondary = document.createElement('span');
     secondary.className = 'cand-file';
     secondary.textContent = [email, formatPhone(phone), filename, formatUploaded(created_at)].filter(Boolean).join(' · ');
@@ -212,7 +225,6 @@ function renderResumeList() {
       topRow.append(iconButton('retry', 'Retry', btn => retryResume(resume_id, btn)));
     }
     topRow.append(viewBtn, dlBtn, delBtn);
-    const editing = editingTagsId === resume_id;
     const tagRow = document.createElement('div');
     tagRow.className = 'tag-row' + (editing ? ' picker' : '');
     for (const tag of ALL_TAGS) {
@@ -230,8 +242,9 @@ function renderResumeList() {
     const editBtn = document.createElement('button');
     editBtn.className = 'tag-edit';
     editBtn.textContent = editing ? 'Done' : 'Edit';
+    if (!editing) editBtn.title = 'Edit name and tags';
     editBtn.addEventListener('click', () => {
-      editingTagsId = editing ? null : resume_id;
+      editingId = editing ? null : resume_id;
       renderResumeList();
     });
     tagRow.appendChild(editBtn);
@@ -264,6 +277,35 @@ async function toggleTag(resumeId, chip) {
     renderResumeList();
     renderScopeLabel();
     console.error('Tag update failed', e);
+  }
+}
+
+// Not redrawn on success: the change fires as Done is clicked, and a redraw would swallow that click.
+async function renameCandidate(resume, input) {
+  const prev = resume.candidate_name;
+  const next = input.value.trim();
+  if (!next || next === prev) { input.value = prev || ''; return; }
+  const status = document.getElementById('deleteStatus');
+  resume.candidate_name = next;
+  try {
+    const res = await apiFetch(`/resumes/${resume.resume_id}`, {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({candidate_name: next}),
+    });
+    if (!res) return;
+    if (!res.ok) throw new Error(await errorText(res));
+    status.textContent = '';
+    if (chatResumeId === resume.resume_id) {
+      chatResumeName = next;
+      document.getElementById('resumeSearch').value = next;
+      renderScopeLabel();
+    }
+  } catch(e) {
+    resume.candidate_name = prev;
+    renderResumeList();
+    status.className = 'status error';
+    status.textContent = 'Rename failed: ' + e.message;
   }
 }
 
