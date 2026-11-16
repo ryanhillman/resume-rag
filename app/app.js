@@ -37,44 +37,40 @@ async function loadTags() {
   if (resumeData.length) renderResumeList();
 }
 
-function renderUploadTags() {
-  const row = document.getElementById('uploadTagRow');
+const hasAllTags = (resume, tags) => [...tags].every(t => (resume.tags || []).includes(t));
+
+// A labeled row of tag chips that adds and removes names in `selected`.
+function renderTagPicker(rowId, labelText, selected, onChange) {
+  const row = document.getElementById(rowId);
   row.innerHTML = '';
   if (!ALL_TAGS.length) return;
+  const label = document.createElement('span');
+  label.className = 'chip-label';
+  label.textContent = labelText;
+  row.appendChild(label);
   for (const tag of ALL_TAGS) {
     const chip = document.createElement('button');
-    chip.className = 'tag-chip' + (uploadTags.has(tag.name) ? '' : ' off');
+    chip.className = 'tag-chip' + (selected.has(tag.name) ? '' : ' off');
     chip.style.cssText = `background:${tag.bg};color:${tag.text}`;
     chip.textContent = tag.name;
     chip.addEventListener('click', () => {
-      uploadTags.has(tag.name) ? uploadTags.delete(tag.name) : uploadTags.add(tag.name);
-      chip.className = 'tag-chip' + (uploadTags.has(tag.name) ? '' : ' off');
+      selected.has(tag.name) ? selected.delete(tag.name) : selected.add(tag.name);
+      chip.classList.toggle('off', !selected.has(tag.name));
+      if (onChange) onChange();
     });
     row.appendChild(chip);
   }
 }
 
+function renderUploadTags() {
+  renderTagPicker('uploadTagRow', 'Tags', uploadTags);
+}
+
 function renderFilterBar() {
-  const bar = document.getElementById('tagFilter');
-  bar.innerHTML = '';
-  if (!ALL_TAGS.length) return;
-  const label = document.createElement('span');
-  label.className = 'filter-label';
-  label.textContent = 'Filter:';
-  bar.appendChild(label);
-  for (const tag of ALL_TAGS) {
-    const chip = document.createElement('button');
-    chip.className = 'filter-chip ' + (activeFilters.has(tag.name) ? 'on' : 'off');
-    chip.style.cssText = `background:${tag.bg};color:${tag.text}`;
-    chip.textContent = tag.name;
-    chip.addEventListener('click', () => {
-      activeFilters.has(tag.name) ? activeFilters.delete(tag.name) : activeFilters.add(tag.name);
-      renderFilterBar();
-      renderResumeList();
-      renderScopeLabel();
-    });
-    bar.appendChild(chip);
-  }
+  renderTagPicker('tagFilter', 'Filter', activeFilters, () => {
+    renderResumeList();
+    renderScopeLabel();
+  });
 }
 
 async function refreshResumes() {
@@ -120,7 +116,7 @@ function renderResumeList() {
   // A query made only of phone characters also matches on digits, whatever the stored format.
   const qDigits = /^[\d\s().+-]+$/.test(q) ? q.replace(/\D/g, '') : '';
   const visible = resumeData.filter(r => {
-    if (activeFilters.size && ![...activeFilters].every(t => (r.tags || []).includes(t))) return false;
+    if (!hasAllTags(r, activeFilters)) return false;
     if (!q) return true;
     if (qDigits && (r.phone || '').replace(/\D/g, '').includes(qDigits)) return true;
     return [r.candidate_name, r.email, r.filename, r.phone].some(v => (v || '').toLowerCase().includes(q));
@@ -359,10 +355,7 @@ function renderScopeLabel() {
     strong.textContent = chatResumeName;
     label.append('Asking about: ', strong, ' ', clearBtn());
   } else if (activeFilters.size) {
-    const matching = resumeData.filter(r =>
-      r.status === 'ready' && [...activeFilters].every(t => (r.tags || []).includes(t))
-    );
-    const count = matching.length;
+    const count = resumeData.filter(r => r.status === 'ready' && hasAllTags(r, activeFilters)).length;
     const strong = document.createElement('strong');
     strong.textContent = `${count} resume${count !== 1 ? 's' : ''}`;
     label.append('Asking about: ', strong, ' matching filter ', clearBtn());
