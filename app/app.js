@@ -25,6 +25,10 @@ let chatResumeId = null;
 let chatResumeName = null;
 
 const DELETE_CONFIRM_MS = 4000;
+const FLAG_TEXT = {
+  hidden_text: 'Hidden text was removed from this PDF.',
+  instruction_like_text: 'This resume contains text that reads like instructions to an AI.',
+};
 
 async function loadTags() {
   try {
@@ -83,6 +87,12 @@ async function refreshResumes() {
   } catch(e) { console.error('Could not load resumes', e); }
 }
 
+// Shows US numbers one way, whatever format the resume used.
+function formatPhone(p) {
+  const d = (p || '').replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '');
+  return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : p;
+}
+
 function formatUploaded(ts) {
   if (!ts) return '';
   const d = new Date(ts);
@@ -121,9 +131,11 @@ function renderResumeList() {
     if (qDigits && (r.phone || '').replace(/\D/g, '').includes(qDigits)) return true;
     return [r.candidate_name, r.email, r.filename, r.phone].some(v => (v || '').toLowerCase().includes(q));
   });
+  document.getElementById('candidateCount').textContent =
+    visible.length === resumeData.length ? resumeData.length || '' : `${visible.length} of ${resumeData.length}`;
   if (!visible.length) {
     list.innerHTML = '<p class="empty">' +
-      (resumeData.length ? 'No candidates match.' : 'No resumes uploaded yet.') + '</p>';
+      (resumeData.length ? 'No candidates match.' : 'No candidates yet.') + '</p>';
     return;
   }
   for (const r of visible) {
@@ -135,7 +147,7 @@ function renderResumeList() {
     primary.textContent = candidate_name || filename;
     const secondary = document.createElement('span');
     secondary.className = 'cand-file';
-    secondary.textContent = [email, phone, filename, formatUploaded(created_at)].filter(Boolean).join(' · ');
+    secondary.textContent = [email, formatPhone(phone), filename, formatUploaded(created_at)].filter(Boolean).join(' · ');
     nameSpan.append(primary, secondary);
     const viewBtn = iconButton('view', 'View', () =>
       window.open(`/resumes/${resume_id}/file`, '_blank', 'noopener'));
@@ -165,13 +177,13 @@ function renderResumeList() {
     if (status !== 'ready') {
       const statusBadge = document.createElement('span');
       statusBadge.className = `badge badge-${status}`;
-      statusBadge.textContent = status;
+      statusBadge.textContent = status === 'ingesting' ? 'processing' : status;
       topRow.appendChild(statusBadge);
     }
     if (flags && flags.length) {
       const warnBadge = document.createElement('span');
       warnBadge.className = 'badge badge-inject';
-      warnBadge.title = 'Possible injection detected: ' + flags.join(', ');
+      warnBadge.title = flags.map(f => FLAG_TEXT[f] || f).join('\n');
       warnBadge.innerHTML = svgIcon('inject');
       topRow.appendChild(warnBadge);
     }
@@ -244,7 +256,7 @@ async function retryResume(resumeId, btn) {
     const idx = resumeData.findIndex(r => r.resume_id === resumeId);
     if (idx !== -1) resumeData[idx].status = 'ingesting';
     statusEl.className = 'status';
-    statusEl.textContent = 'Re-running ingest…';
+    statusEl.textContent = 'Processing again…';
     renderResumeList();
     pollIngest(resumeId, statusEl);
   } catch(e) {
@@ -276,8 +288,7 @@ async function deleteResume(resumeId, btn) {
     const res = await apiFetch(`/resumes/${resumeId}`, {method: 'DELETE'});
     if (!res) return;
     if (!res.ok) throw new Error(await errorText(res));
-    status.className = 'status';
-    status.textContent = 'Resume deleted.';
+    status.textContent = '';
     await refreshResumes();
   } catch(e) {
     status.className = 'status error';
@@ -302,7 +313,7 @@ async function uploadFile() {
     if (!res) return;
     if (!res.ok) throw new Error(await errorText(res));
     const data = await res.json();
-    status.textContent = `Ingesting ${data.filename}…`;
+    status.textContent = `Processing ${data.filename}…`;
     input.value = '';
     uploadTags.clear();
     renderUploadTags();
@@ -331,7 +342,7 @@ async function pollIngest(resumeId, statusEl) {
       }
       if (data.status === 'failed') {
         statusEl.className = 'status error';
-        statusEl.textContent = `Ingest failed for ${data.filename}.`;
+        statusEl.textContent = `Processing failed for ${data.filename}.`;
         await refreshResumes();
         return;
       }
@@ -357,10 +368,10 @@ function renderScopeLabel() {
   } else if (activeFilters.size) {
     const count = resumeData.filter(r => r.status === 'ready' && hasAllTags(r, activeFilters)).length;
     const strong = document.createElement('strong');
-    strong.textContent = `${count} resume${count !== 1 ? 's' : ''}`;
+    strong.textContent = `${count} candidate${count !== 1 ? 's' : ''}`;
     label.append('Asking about: ', strong, ' matching filter ', clearBtn());
   } else {
-    label.textContent = 'Asking about: all resumes';
+    label.textContent = 'Asking about: all candidates';
   }
 }
 

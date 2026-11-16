@@ -59,7 +59,15 @@
       background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 16px;
       padding: 16px; box-shadow: var(--panel-shadow);
     }
-    h2 { font-size: var(--text-lg); font-weight: 650; letter-spacing: -0.01em; margin-bottom: 8px; color: var(--ink); }
+    h2 {
+      display: flex; align-items: center; gap: 8px;
+      font-size: var(--text-lg); font-weight: 650; letter-spacing: -0.01em; margin-bottom: 8px; color: var(--ink);
+    }
+    .count {
+      font-size: var(--text-xs); font-weight: 600; letter-spacing: 0; color: var(--muted);
+      background: rgba(27, 33, 64, 0.08); padding: 1px 8px; border-radius: 999px;
+    }
+    .count:empty { display: none; }
     .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     input[type="file"] { flex: 1; min-width: 0; font-size: var(--text-md); color: var(--muted); }
     input[type="file"]::file-selector-button {
@@ -207,7 +215,7 @@
       </section>
 
       <section class="card list-card">
-        <h2>Candidates</h2>
+        <h2>Candidates <span class="count" id="candidateCount"></span></h2>
         <input type="text" id="candidateSearch" placeholder="Filter by name, email, phone number, or file" autocomplete="off" />
         <div id="tagFilter" class="tag-row picker"></div>
         <div id="resumeList"></div>
@@ -218,12 +226,12 @@
     <section class="card chat-card">
       <h2>Ask a question</h2>
       <div class="search-wrap">
-        <input type="text" id="resumeSearch" placeholder="Search by name" autocomplete="off" />
+        <input type="text" id="resumeSearch" placeholder="Type a name to ask about a candidate" autocomplete="off" />
         <div id="resumeSuggestions"></div>
       </div>
-      <div id="scopeLabel">Asking about: all resumes</div>
+      <div id="scopeLabel">Asking about: all candidates</div>
       <div class="row">
-        <input type="text" id="messageInput" placeholder="Ask a question here" />
+        <input type="text" id="messageInput" placeholder="What would you like to know?" />
         <button id="sendBtn" class="btn-primary">Send</button>
       </div>
       <div id="chatOutput"></div>

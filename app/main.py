@@ -982,7 +982,7 @@ def chat(req: ChatRequest):
         _validate_tags(req.tags)
         scope_ids = _get_resume_ids_by_tags(req.tags)
         if not scope_ids:
-            return {"answer": "No resumes with the selected tags have been ingested yet.", "sources": []}
+            return {"answer": "No candidates with the selected tags are ready yet.", "sources": []}
     else:
         scope_ids = None
 
