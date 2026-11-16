@@ -315,6 +315,7 @@ async function uploadFile() {
     const data = await res.json();
     status.textContent = `Processing ${data.filename}…`;
     input.value = '';
+    showFile();
     uploadTags.clear();
     renderUploadTags();
     await refreshResumes();
@@ -445,6 +446,27 @@ async function sendMessage() {
   }
 }
 
+const fileInput = document.getElementById('fileInput');
+const dropzone = document.getElementById('dropzone');
+const FILE_PROMPT = document.getElementById('fileLabel').innerHTML;
+
+function showFile() {
+  const file = fileInput.files[0];
+  const label = document.getElementById('fileLabel');
+  if (file) label.textContent = file.name;
+  else label.innerHTML = FILE_PROMPT;
+  dropzone.classList.toggle('has-file', Boolean(file));
+}
+
+fileInput.addEventListener('change', showFile);
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('over'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('over'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('over');
+  fileInput.files = e.dataTransfer.files;
+  showFile();
+});
 document.getElementById('uploadBtn').addEventListener('click', uploadFile);
 document.getElementById('sendBtn').addEventListener('click', sendMessage);
 document.getElementById('messageInput').addEventListener('keydown', e => {
