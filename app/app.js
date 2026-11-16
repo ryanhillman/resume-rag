@@ -45,27 +45,41 @@ async function loadTags() {
 
 const hasAllTags = (resume, tags) => [...tags].every(t => (resume.tags || []).includes(t));
 
+const openPickers = new Set();
+
 // A labeled row of tag chips that adds and removes names in `selected`.
+// Closed, it shows only the picked tags; Edit opens the full set.
 function renderTagPicker(rowId, labelText, selected, onChange) {
   const row = document.getElementById(rowId);
   row.innerHTML = '';
   if (!ALL_TAGS.length) return;
+  const open = openPickers.has(rowId);
+  const redraw = () => renderTagPicker(rowId, labelText, selected, onChange);
   const label = document.createElement('span');
   label.className = 'chip-label';
   label.textContent = labelText;
   row.appendChild(label);
   for (const tag of ALL_TAGS) {
+    if (!open && !selected.has(tag.name)) continue;
     const chip = document.createElement('button');
     chip.className = 'tag-chip' + (selected.has(tag.name) ? '' : ' off');
     chip.style.cssText = `background:${tag.bg};color:${tag.text}`;
     chip.textContent = tag.name;
     chip.addEventListener('click', () => {
       selected.has(tag.name) ? selected.delete(tag.name) : selected.add(tag.name);
-      chip.classList.toggle('off', !selected.has(tag.name));
+      redraw();
       if (onChange) onChange();
     });
     row.appendChild(chip);
   }
+  const toggle = document.createElement('button');
+  toggle.className = 'tag-edit';
+  toggle.textContent = open ? 'Done' : 'Edit';
+  toggle.addEventListener('click', () => {
+    open ? openPickers.delete(rowId) : openPickers.add(rowId);
+    redraw();
+  });
+  row.appendChild(toggle);
 }
 
 function renderUploadTags() {
