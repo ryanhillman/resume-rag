@@ -93,10 +93,21 @@ function formatUploaded(ts) {
   return isNaN(d) ? '' : d.toLocaleDateString(undefined, {year: 'numeric', month: 'short', day: 'numeric'});
 }
 
-function iconButton(kind, icon, label, onClick) {
+const ICONS = {
+  view: "<path d='M14 4h6v6'/><path d='M20 4l-9 9'/><path d='M18 14v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h5'/>",
+  download: "<path d='M12 4v11'/><path d='M7 11l5 5 5-5'/><path d='M5 20h14'/>",
+  delete: "<path d='M4 7h16'/><path d='M9 7V4h6v3'/><path d='M6 7l1 13h10l1-13'/><path d='M10 11v5M14 11v5'/>",
+  retry: "<path d='M20 11a8 8 0 1 0-2.3 6'/><path d='M20 5v6h-6'/>",
+  inject: "<path d='M12 4l9 16H3z'/><path d='M12 10v4M12 17h.01'/>",
+};
+
+const svgIcon = name =>
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;
+
+function iconButton(kind, label, onClick) {
   const btn = document.createElement('button');
   btn.className = `btn-sm btn-${kind}`;
-  btn.textContent = icon;
+  btn.innerHTML = svgIcon(kind);
   btn.title = label;
   btn.addEventListener('click', () => onClick(btn));
   return btn;
@@ -130,13 +141,12 @@ function renderResumeList() {
     secondary.className = 'cand-file';
     secondary.textContent = [email, phone, filename, formatUploaded(created_at)].filter(Boolean).join(' · ');
     nameSpan.append(primary, secondary);
-    const viewBtn = iconButton('view', '↗', 'View', () =>
+    const viewBtn = iconButton('view', 'View', () =>
       window.open(`/resumes/${resume_id}/file`, '_blank', 'noopener'));
-    const dlBtn = iconButton('download', '↓', 'Download', () => downloadResume(resume_id, filename));
+    const dlBtn = iconButton('download', 'Download', () => downloadResume(resume_id, filename));
     const confirming = confirmingDeleteId === resume_id;
     const delBtn = iconButton(
       'delete',
-      confirming ? 'Delete?' : '✕',
       confirming ? 'Click again to delete' : 'Delete',
       btn => {
         if (confirming) return deleteResume(resume_id, btn);
@@ -149,7 +159,10 @@ function renderResumeList() {
         }, DELETE_CONFIRM_MS);
       },
     );
-    delBtn.classList.toggle('confirm', confirming);
+    if (confirming) {
+      delBtn.classList.add('confirm');
+      delBtn.textContent = 'Delete?';
+    }
     const topRow = document.createElement('div');
     topRow.className = 'resume-row';
     topRow.append(nameSpan);
@@ -163,11 +176,11 @@ function renderResumeList() {
       const warnBadge = document.createElement('span');
       warnBadge.className = 'badge badge-inject';
       warnBadge.title = 'Possible injection detected: ' + flags.join(', ');
-      warnBadge.textContent = '⚠';
+      warnBadge.innerHTML = svgIcon('inject');
       topRow.appendChild(warnBadge);
     }
     if (status === 'failed') {
-      topRow.append(iconButton('retry', '↻', 'Retry', btn => retryResume(resume_id, btn)));
+      topRow.append(iconButton('retry', 'Retry', btn => retryResume(resume_id, btn)));
     }
     topRow.append(viewBtn, dlBtn, delBtn);
     const editing = editingTagsId === resume_id;
