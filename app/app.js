@@ -232,13 +232,15 @@ function renderResumeList() {
     for (const tag of ALL_TAGS) {
       const on = (tags || []).includes(tag.name);
       if (!on && !editing) continue;
-      const chip = document.createElement('button');
+      const chip = document.createElement(editing ? 'button' : 'span');
       chip.className = 'tag-chip' + (on ? '' : ' off');
       chip.style.cssText = `background:${tag.bg};color:${tag.text}`;
       chip.textContent = tag.name;
-      chip.dataset.tag = tag.name;
-      chip.title = `${on ? 'Remove' : 'Add'} ${tag.name}`;
-      chip.addEventListener('click', () => toggleTag(resume_id, chip));
+      if (editing) {
+        chip.dataset.tag = tag.name;
+        chip.title = `${on ? 'Remove' : 'Add'} ${tag.name}`;
+        chip.addEventListener('click', () => toggleTag(resume_id, chip));
+      }
       tagRow.appendChild(chip);
     }
     const editBtn = document.createElement('button');
