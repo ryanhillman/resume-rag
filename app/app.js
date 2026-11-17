@@ -71,6 +71,14 @@ function renderTagPicker(rowId, labelText, selected, onChange) {
   label.className = 'chip-label';
   label.textContent = labelText;
   row.appendChild(label);
+  const toggle = document.createElement('button');
+  toggle.className = 'tag-edit';
+  toggle.textContent = open ? 'Done' : 'Edit';
+  toggle.addEventListener('click', () => {
+    open ? openPickers.delete(rowId) : openPickers.add(rowId);
+    redraw();
+  });
+  row.appendChild(toggle);
   for (const tag of ALL_TAGS) {
     if (!open && !selected.has(tag.name)) continue;
     const chip = document.createElement('button');
@@ -84,14 +92,6 @@ function renderTagPicker(rowId, labelText, selected, onChange) {
     });
     row.appendChild(chip);
   }
-  const toggle = document.createElement('button');
-  toggle.className = 'tag-edit';
-  toggle.textContent = open ? 'Done' : 'Edit';
-  toggle.addEventListener('click', () => {
-    open ? openPickers.delete(rowId) : openPickers.add(rowId);
-    redraw();
-  });
-  row.appendChild(toggle);
 }
 
 function renderUploadTags() {
@@ -241,6 +241,15 @@ function renderResumeList() {
     topRow.append(viewBtn, dlBtn, delBtn);
     const tagRow = document.createElement('div');
     tagRow.className = 'tag-row' + (editing ? ' picker' : '');
+    const editBtn = document.createElement('button');
+    editBtn.className = 'tag-edit';
+    editBtn.textContent = editing ? 'Done' : 'Edit';
+    if (!editing) editBtn.title = 'Edit name and tags';
+    editBtn.addEventListener('click', () => {
+      editingId = editing ? null : resume_id;
+      renderResumeList();
+    });
+    tagRow.appendChild(editBtn);
     for (const tag of ALL_TAGS) {
       const on = (tags || []).includes(tag.name);
       if (!on && !editing) continue;
@@ -255,15 +264,6 @@ function renderResumeList() {
       }
       tagRow.appendChild(chip);
     }
-    const editBtn = document.createElement('button');
-    editBtn.className = 'tag-edit';
-    editBtn.textContent = editing ? 'Done' : 'Edit';
-    if (!editing) editBtn.title = 'Edit name and tags';
-    editBtn.addEventListener('click', () => {
-      editingId = editing ? null : resume_id;
-      renderResumeList();
-    });
-    tagRow.appendChild(editBtn);
     const card = document.createElement('div');
     card.className = 'resume-card';
     card.append(topRow, tagRow);
