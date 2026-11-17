@@ -4,14 +4,13 @@ async function apiFetch(url, opts = {}) {
   return res;
 }
 
-// FastAPI puts an error's message in "detail".
+// FastAPI puts an error's message in "detail". The proxy's own replies have no body.
 async function errorText(res) {
-  const body = await res.text();
   try {
-    const { detail } = JSON.parse(body);
+    const { detail } = await res.json();
     if (typeof detail === 'string') return detail;
   } catch {}
-  return body;
+  return res.status === 413 ? 'File too large.' : `Something went wrong (${res.status}).`;
 }
 
 let ALL_TAGS = [];
