@@ -62,7 +62,7 @@ function renderTagPicker(rowId, labelText, selected, onChange) {
     if (!open && !selected.has(tag.name)) continue;
     const chip = document.createElement('button');
     chip.className = 'tag-chip' + (selected.has(tag.name) ? '' : ' off');
-    chip.style.cssText = `background:${tag.bg};color:${tag.text}`;
+    chip.style.cssText = `--tag-bg:${tag.bg};--tag-text:${tag.text}`;
     chip.textContent = tag.name;
     chip.addEventListener('click', () => {
       selected.has(tag.name) ? selected.delete(tag.name) : selected.add(tag.name);
@@ -233,7 +233,7 @@ function renderResumeList() {
       if (!on && !editing) continue;
       const chip = document.createElement(editing ? 'button' : 'span');
       chip.className = 'tag-chip' + (on ? '' : ' off');
-      chip.style.cssText = `background:${tag.bg};color:${tag.text}`;
+      chip.style.cssText = `--tag-bg:${tag.bg};--tag-text:${tag.text}`;
       chip.textContent = tag.name;
       if (editing) {
         chip.dataset.tag = tag.name;
