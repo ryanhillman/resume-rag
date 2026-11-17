@@ -290,7 +290,7 @@ async function renameCandidate(resumeId, input) {
   const prev = resume.candidate_name;
   const next = input.value.trim();
   if (!next || next === prev) { input.value = prev || ''; return; }
-  const status = document.getElementById('deleteStatus');
+  const status = document.getElementById('listStatus');
   resume.candidate_name = next;
   try {
     const res = await apiFetch(`/resumes/${resumeId}`, {
@@ -316,7 +316,7 @@ async function renameCandidate(resumeId, input) {
 
 async function retryResume(resumeId, btn) {
   btn.disabled = true;
-  const statusEl = document.getElementById('deleteStatus');
+  const statusEl = document.getElementById('listStatus');
   try {
     const res = await apiFetch(`/resumes/${resumeId}/retry`, {method: 'POST'});
     if (!res) return;
@@ -350,7 +350,7 @@ async function downloadResume(resumeId, filename) {
 }
 
 async function deleteResume(resumeId, btn) {
-  const status = document.getElementById('deleteStatus');
+  const status = document.getElementById('listStatus');
   btn.disabled = true;
   try {
     const res = await apiFetch(`/resumes/${resumeId}`, {method: 'DELETE'});
@@ -388,7 +388,7 @@ async function uploadFile() {
     renderUploadTags();
     await refreshResumes();
     pollIngest(data.resume_id, status);
-  } catch (e) {
+  } catch(e) {
     status.className = 'status error';
     status.textContent = e.message;
   } finally {
@@ -415,13 +415,12 @@ async function pollIngest(resumeId, statusEl) {
         await refreshResumes();
         return;
       }
-    } catch(e) { break; }
+    } catch { break; }
   }
 }
 
 function renderScopeLabel() {
   const label = document.getElementById('scopeLabel');
-  if (!label) return;
   label.innerHTML = '';
   const clearBtn = onClick => {
     const btn = document.createElement('span');
@@ -522,7 +521,7 @@ async function sendMessage() {
     answer.innerHTML = DOMPurify.sanitize(marked.parse(data.answer));
     out.replaceChildren(asked, answer);
     input.value = '';
-  } catch (e) {
+  } catch(e) {
     const span = document.createElement('span');
     span.className = 'chat-error';
     span.textContent = 'Error: ' + e.message;
