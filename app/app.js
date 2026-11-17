@@ -104,7 +104,7 @@ function renderFilterBar() {
 
 // A question goes to one candidate or to tags, never both: picking a tag drops the candidate.
 function renderChatTags() {
-  renderTagPicker('chatTagRow', 'Tags', chatTags, () => {
+  renderTagPicker('chatTagRow', 'Filter', chatTags, () => {
     if (chatResumeId) clearChatCandidate();
     else renderScopeLabel();
   });
