@@ -429,27 +429,15 @@ async function pollIngest(resumeId, statusEl) {
 }
 
 function renderScopeLabel() {
-  const label = document.getElementById('scopeLabel');
-  label.innerHTML = '';
-  const clearBtn = onClick => {
-    const btn = document.createElement('span');
-    btn.className = 'scope-clear';
-    btn.textContent = '✕ clear';
-    btn.addEventListener('click', onClick);
-    return btn;
-  };
+  let text = 'All candidates';
   if (chatResumeId) {
-    const strong = document.createElement('strong');
-    strong.textContent = chatResumeName;
-    label.append('Asking about: ', strong, ' ', clearBtn(clearChatCandidate));
+    text = chatResumeName;
   } else if (chatTags.size) {
     const count = resumeData.filter(r => r.status === 'ready' && hasAllTags(r, chatTags)).length;
-    const strong = document.createElement('strong');
-    strong.textContent = `${count} candidate${count !== 1 ? 's' : ''}`;
-    label.append('Asking about: ', strong, ' ', clearBtn(clearChatTags));
-  } else {
-    label.textContent = 'Asking about: all candidates';
+    text = `${count} candidate${count !== 1 ? 's' : ''}`;
   }
+  document.getElementById('scopeLabel').textContent = text;
+  document.getElementById('scopeClear').hidden = !chatResumeId && !chatTags.size;
 }
 
 function clearChatCandidate() {
@@ -569,6 +557,10 @@ document.getElementById('messageInput').addEventListener('keydown', e => {
 document.getElementById('candidateSearch').addEventListener('input', e => {
   candidateQuery = e.target.value;
   renderResumeList();
+});
+document.getElementById('scopeClear').addEventListener('click', () => {
+  if (chatResumeId) clearChatCandidate();
+  else clearChatTags();
 });
 document.getElementById('resumeSearch').addEventListener('input', e => {
   showResumeSuggestions(e.target.value);

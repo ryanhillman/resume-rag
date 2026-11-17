@@ -70,7 +70,7 @@
       font-size: var(--text-lg); font-weight: 650; letter-spacing: -0.01em; margin-bottom: 8px; color: var(--ink);
     }
     .count {
-      font-size: var(--text-xs); font-weight: 600; letter-spacing: 0; color: var(--muted);
+      font-size: var(--text-xs); font-weight: 600; letter-spacing: 0; color: var(--ink);
       background: var(--wash); padding: 1px 8px; border-radius: 999px;
     }
     .count:empty { display: none; }
@@ -189,8 +189,7 @@
     .chip-label { font-size: var(--text-sm); font-weight: 550; color: var(--muted); margin-right: 4px; }
     .search-wrap { position: relative; margin-bottom: 8px; }
     .search-wrap input { width: 100%; }
-    #scopeLabel { font-size: var(--text-sm); font-weight: 450; color: var(--muted); margin-bottom: 10px; }
-    #scopeLabel strong { color: var(--ink); }
+    #scopeLabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     #chatOutput {
       margin-top: 12px; overflow-wrap: anywhere;
       background: var(--well); border: 1px solid var(--line); border-radius: 12px;
@@ -223,7 +222,7 @@
     }
     .suggestion { padding: 7px 12px; cursor: pointer; font-size: var(--text-md); }
     .suggestion:hover { background: rgba(198, 208, 255, 0.18); }
-    .scope-clear { font-size: var(--text-sm); color: var(--accent); cursor: pointer; margin-left: 6px; }
+    .scope-clear { font-size: var(--text-sm); font-weight: 500; letter-spacing: 0; color: var(--muted); cursor: pointer; }
     .scope-clear:hover { text-decoration: underline; }
   </style>
 </head>
@@ -262,13 +261,12 @@
     </div>
 
     <section class="card chat-card">
-      <h2>Ask a question</h2>
+      <h2>Ask a question <span class="count" id="scopeLabel">All candidates</span><span class="scope-clear" id="scopeClear" hidden>✕ clear</span></h2>
       <div class="search-wrap">
         <input type="text" id="resumeSearch" placeholder="Type a name to ask about a candidate" autocomplete="off" />
         <div id="resumeSuggestions"></div>
       </div>
       <div id="chatTagRow" class="tag-row picker"></div>
-      <div id="scopeLabel">Asking about: all candidates</div>
       <div class="row">
         <input type="text" id="messageInput" placeholder="What would you like to know?" maxlength="2000" />
         <button id="sendBtn" class="btn-primary">Send</button>
