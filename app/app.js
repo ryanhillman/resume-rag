@@ -13,6 +13,19 @@ async function errorText(res) {
   return res.status === 413 ? 'File too large.' : `Something went wrong (${res.status}).`;
 }
 
+// One error at a time, in the top bar, until it is dismissed or the next action starts.
+function showError(text) {
+  const close = document.createElement('button');
+  close.textContent = '✕';
+  close.title = 'Dismiss';
+  close.addEventListener('click', clearError);
+  document.getElementById('toast').replaceChildren(text, close);
+}
+
+function clearError() {
+  document.getElementById('toast').replaceChildren();
+}
+
 let ALL_TAGS = [];
 let activeFilters = new Set();
 let candidateQuery = '';
@@ -267,6 +280,7 @@ async function toggleTag(resumeId, chip) {
   resumeData[idx].tags = next;
   renderResumeList();
   renderScopeLabel();
+  clearError();
   try {
     const res = await apiFetch(`/resumes/${resumeId}/tags`, {
       method: 'PUT',
@@ -279,7 +293,7 @@ async function toggleTag(resumeId, chip) {
     resumeData[idx].tags = prev;
     renderResumeList();
     renderScopeLabel();
-    console.error('Tag update failed', e);
+    showError('Tag update failed: ' + e.message);
   }
 }
 
@@ -290,8 +304,8 @@ async function renameCandidate(resumeId, input) {
   const prev = resume.candidate_name;
   const next = input.value.trim();
   if (!next || next === prev) { input.value = prev || ''; return; }
-  const status = document.getElementById('listStatus');
   resume.candidate_name = next;
+  clearError();
   try {
     const res = await apiFetch(`/resumes/${resumeId}`, {
       method: 'PATCH',
@@ -300,7 +314,6 @@ async function renameCandidate(resumeId, input) {
     });
     if (!res) return;
     if (!res.ok) throw new Error(await errorText(res));
-    status.textContent = '';
     if (chatResumeId === resumeId) {
       chatResumeName = next;
       document.getElementById('resumeSearch').value = next;
@@ -309,32 +322,31 @@ async function renameCandidate(resumeId, input) {
   } catch(e) {
     resume.candidate_name = prev;
     renderResumeList();
-    status.className = 'status error';
-    status.textContent = 'Rename failed: ' + e.message;
+    showError('Rename failed: ' + e.message);
   }
 }
 
 async function retryResume(resumeId, btn) {
   btn.disabled = true;
   const statusEl = document.getElementById('listStatus');
+  clearError();
   try {
     const res = await apiFetch(`/resumes/${resumeId}/retry`, {method: 'POST'});
     if (!res) return;
     if (!res.ok) throw new Error(await errorText(res));
     const idx = resumeData.findIndex(r => r.resume_id === resumeId);
     if (idx !== -1) resumeData[idx].status = 'ingesting';
-    statusEl.className = 'status';
     statusEl.textContent = 'Processing again…';
     renderResumeList();
     pollIngest(resumeId, statusEl);
   } catch(e) {
     btn.disabled = false;
-    statusEl.className = 'status error';
-    statusEl.textContent = 'Retry failed: ' + e.message;
+    showError('Retry failed: ' + e.message);
   }
 }
 
 async function downloadResume(resumeId, filename) {
+  clearError();
   try {
     const res = await apiFetch(`/resumes/${resumeId}/file?download=true`);
     if (!res) return;
@@ -346,21 +358,19 @@ async function downloadResume(resumeId, filename) {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-  } catch(e) { console.error('Download failed', e); }
+  } catch(e) { showError('Download failed: ' + e.message); }
 }
 
 async function deleteResume(resumeId, btn) {
-  const status = document.getElementById('listStatus');
   btn.disabled = true;
+  clearError();
   try {
     const res = await apiFetch(`/resumes/${resumeId}`, {method: 'DELETE'});
     if (!res) return;
     if (!res.ok) throw new Error(await errorText(res));
-    status.textContent = '';
     await refreshResumes();
   } catch(e) {
-    status.className = 'status error';
-    status.textContent = 'Delete failed: ' + e.message;
+    showError('Delete failed: ' + e.message);
     btn.disabled = false;
   }
 }
@@ -371,11 +381,11 @@ async function uploadFile() {
   const btn = document.getElementById('uploadBtn');
   const status = document.getElementById('uploadStatus');
   btn.disabled = true;
-  status.className = 'status';
   status.textContent = 'Uploading…';
   const formData = new FormData();
   formData.append('file', input.files[0]);
   if (uploadTags.size) formData.append('tags', JSON.stringify([...uploadTags]));
+  clearError();
   try {
     const res = await apiFetch('/upload', {method: 'POST', body: formData});
     if (!res) return;
@@ -389,8 +399,8 @@ async function uploadFile() {
     await refreshResumes();
     pollIngest(data.resume_id, status);
   } catch(e) {
-    status.className = 'status error';
-    status.textContent = e.message;
+    status.textContent = '';
+    showError('Upload failed: ' + e.message);
   } finally {
     btn.disabled = false;
   }
@@ -404,14 +414,13 @@ async function pollIngest(resumeId, statusEl) {
       if (!res) return;
       const data = await res.json();
       if (data.status === 'ready') {
-        statusEl.className = 'status';
         statusEl.textContent = `${data.filename} ready.`;
         await refreshResumes();
         return;
       }
       if (data.status === 'failed') {
-        statusEl.className = 'status error';
-        statusEl.textContent = `Processing failed for ${data.filename}.`;
+        statusEl.textContent = '';
+        showError(`Processing failed for ${data.filename}.`);
         await refreshResumes();
         return;
       }
