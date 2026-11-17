@@ -141,6 +141,8 @@ function iconButton(kind, label, onClick) {
 }
 
 function renderResumeList() {
+  // A redraw would save and discard a name that is being typed; the next one catches up.
+  if (document.activeElement?.matches('input.cand-name')) return;
   const list = document.getElementById('resumeList');
   list.innerHTML = '';
   const q = candidateQuery.trim().toLowerCase();
@@ -171,9 +173,9 @@ function renderResumeList() {
       primary.value = candidate_name || '';
       primary.maxLength = 200;
       primary.placeholder = 'Candidate name';
-      primary.addEventListener('change', () => renameCandidate(r, primary));
+      primary.addEventListener('change', () => renameCandidate(resume_id, primary));
       primary.addEventListener('keydown', e => {
-        if (e.key === 'Escape') primary.value = r.candidate_name || '';
+        if (e.key === 'Escape') primary.value = resumeData.find(x => x.resume_id === resume_id)?.candidate_name || '';
         if (e.key === 'Enter' || e.key === 'Escape') primary.blur();
       });
     } else {
@@ -191,7 +193,7 @@ function renderResumeList() {
       'delete',
       confirming ? 'Click again to delete' : 'Delete',
       btn => {
-        if (confirming) return deleteResume(resume_id, btn);
+        if (confirmingDeleteId === resume_id) return deleteResume(resume_id, btn);
         confirmingDeleteId = resume_id;
         renderResumeList();
         setTimeout(() => {
@@ -281,14 +283,16 @@ async function toggleTag(resumeId, chip) {
 }
 
 // Not redrawn on success: the change fires as Done is clicked, and a redraw would swallow that click.
-async function renameCandidate(resume, input) {
+async function renameCandidate(resumeId, input) {
+  const resume = resumeData.find(r => r.resume_id === resumeId);
+  if (!resume) return;
   const prev = resume.candidate_name;
   const next = input.value.trim();
   if (!next || next === prev) { input.value = prev || ''; return; }
   const status = document.getElementById('deleteStatus');
   resume.candidate_name = next;
   try {
-    const res = await apiFetch(`/resumes/${resume.resume_id}`, {
+    const res = await apiFetch(`/resumes/${resumeId}`, {
       method: 'PATCH',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({candidate_name: next}),
@@ -296,7 +300,7 @@ async function renameCandidate(resume, input) {
     if (!res) return;
     if (!res.ok) throw new Error(await errorText(res));
     status.textContent = '';
-    if (chatResumeId === resume.resume_id) {
+    if (chatResumeId === resumeId) {
       chatResumeName = next;
       document.getElementById('resumeSearch').value = next;
       renderScopeLabel();
