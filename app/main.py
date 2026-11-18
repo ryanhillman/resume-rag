@@ -816,6 +816,9 @@ def _ingest(resume_id: str, filename: str, text: str):
         _write_chunks(resume_id, chunks, embeddings)
         _mark_resume_ready(resume_id, text[:ROSTER_PREVIEW_CHARS])
         log.info("Ingest complete: resume_id=%s file=%s chunks=%d", resume_id, filename, len(chunks))
+    except psycopg2.errors.ForeignKeyViolation:
+        # The chunks have no resume to belong to: it was deleted while this ran.
+        log.info("Ingest dropped, resume deleted: resume_id=%s file=%s", resume_id, filename)
     except Exception:
         _update_resume_status(resume_id, "failed")
         log.exception("Ingest failed: resume_id=%s file=%s", resume_id, filename)
