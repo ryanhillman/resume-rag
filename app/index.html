@@ -216,7 +216,7 @@
     }
     .suggestion { padding: 7px 12px; cursor: pointer; font-size: var(--text-md); }
     .suggestion:hover { background: rgba(61, 85, 204, 0.1); }
-    .scope-clear { font-size: var(--text-sm); font-weight: 500; letter-spacing: 0; color: var(--accent); cursor: pointer; }
+    .scope-clear { font-size: var(--text-sm); font-weight: 500; letter-spacing: 0; color: var(--accent); background: none; }
     .scope-clear:hover { text-decoration: underline; }
   </style>
 </head>
@@ -255,7 +255,7 @@
     </div>
 
     <section class="card chat-card">
-      <h2>Ask a question <span class="count" id="scopeLabel">All candidates</span><span class="scope-clear" id="scopeClear" hidden>✕ clear</span></h2>
+      <h2>Ask a question <span class="count" id="scopeLabel">All candidates</span><button class="scope-clear" id="scopeClear" hidden>✕ clear</button></h2>
       <div class="search-wrap">
         <input type="text" id="resumeSearch" placeholder="Type a name to ask about a candidate" autocomplete="off" />
         <div id="resumeSuggestions"></div>
