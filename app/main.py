@@ -7,6 +7,7 @@ import pathlib
 import re
 import secrets
 import time
+import unicodedata
 import uuid
 from contextlib import asynccontextmanager, contextmanager
 from typing import Annotated, Optional
@@ -276,7 +277,8 @@ def _extract_visible_text(pdf_bytes: bytes) -> tuple[str, list[str], int]:
         vis = page.filter(_visible).extract_text() or ""
         if len(raw) - len(vis) > 20:
             flags.append("hidden_text")
-        text = vis.strip()
+        # Composed form: a PDF may write é as e followed by a separate accent.
+        text = unicodedata.normalize("NFC", vis.strip())
 
     if SUSPICIOUS.search(text):
         flags.append("instruction_like_text")
@@ -508,20 +510,29 @@ def _get_resume_ids_by_tags(tags: list[str]) -> list[str]:
 
 
 def _candidate_name(filename: str) -> str:
-    stem = filename.rsplit(".", 1)[0]
+    # Composed, as the resume text is: macOS sends file names with each accent as a separate character.
+    stem = unicodedata.normalize("NFC", filename.rsplit(".", 1)[0])
     return stem.replace("_", " ").replace("-", " ").title()
 
 
-NAME_RE = re.compile(r"^[A-Z][A-Za-z'’.-]+(?: [A-Z][A-Za-z'’.-]+){1,3}$")
 EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 PHONE_RE = re.compile(r"\+?\d{0,2}[\s.()-]{0,2}\d{3}[\s.()-]{0,2}\d{3}[\s.-]?\d{4}")
 
 
+def _is_name(line: str) -> bool:
+    """Two to four capitalized words, in any alphabet. After its capital a word
+    holds letters and ' ’ . or -."""
+    words = line.split(" ")
+    return 2 <= len(words) <= 4 and all(
+        len(w) > 1 and w[0].isupper() and all(c.isalpha() or c in "'’.-" for c in w[1:]) for w in words
+    )
+
+
 def _extract_contact(text: str, filename: str) -> tuple[str, Optional[str], Optional[str]]:
-    """Name, email and phone by regex; the name falls back to the filename."""
+    """Name by its shape, email and phone by regex; the name falls back to the filename."""
     name = ""
     for line in text.splitlines()[:10]:
-        if NAME_RE.match(line.strip()):
+        if _is_name(line.strip()):
             name = line.strip()
             break
     if not name:

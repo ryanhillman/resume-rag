@@ -166,6 +166,20 @@ def test_extract_contact_fields():
     assert phone == "(555) 123-4567"
 
 
+@pytest.mark.parametrize("name", ["José García", "Zoë Müller-Lüdtke", "Łukasz Żak", "Chloé O’Neill", "Nguyễn Văn An"])
+def test_extract_contact_reads_accented_names(name):
+    from app.main import _extract_contact
+
+    assert _extract_contact(f"{name}\nSenior Engineer", "resume.pdf")[0] == name
+
+
+@pytest.mark.parametrize("line", ["Senior Engineer 2", "josé garcía", "Madrid, España", "É García"])
+def test_extract_contact_skips_lines_that_are_not_names(line):
+    from app.main import _extract_contact
+
+    assert _extract_contact(line, "tom_becker.pdf")[0] == "Tom Becker"
+
+
 def test_extract_contact_falls_back_to_filename():
     from app.main import _extract_contact
 
@@ -173,6 +187,12 @@ def test_extract_contact_falls_back_to_filename():
     assert name == "Tom Becker Resume"
     assert email is None
     assert phone is None
+
+
+def test_name_from_a_decomposed_filename_is_composed():
+    from app.main import _extract_contact
+
+    assert _extract_contact("no name here", "renée_núñez.pdf")[0] == "Renée Núñez"
 
 
 # --- File serving ---
