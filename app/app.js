@@ -578,7 +578,10 @@ document.getElementById('resumeSearch').addEventListener('input', e => {
 });
 // A press on a suggestion leaves focus in the box, so the list is still open when the click lands.
 document.getElementById('resumeSuggestions').addEventListener('mousedown', e => e.preventDefault());
-document.getElementById('resumeSearch').addEventListener('blur', () => {
+// Clicking away without a pick empties the box, so it never shows a name that is not chosen.
+// Switching windows keeps what was typed.
+document.getElementById('resumeSearch').addEventListener('blur', e => {
+  if (!chatResumeId && document.hasFocus()) e.target.value = '';
   document.getElementById('resumeSuggestions').style.display = 'none';
 });
 document.getElementById('resumeSearch').addEventListener('focus', e => {
