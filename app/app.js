@@ -427,6 +427,8 @@ async function pollIngest(resumeId, statusEl) {
       }
     } catch { break; }
   }
+  // Reached only when the checks end without a result.
+  statusEl.textContent = '';
 }
 
 function renderScopeLabel() {
