@@ -57,6 +57,13 @@ async function loadTags() {
 
 const hasAllTags = (resume, tags) => [...tags].every(t => (resume.tags || []).includes(t));
 
+// Letters that are not a plain letter with an accent added, so removing accents leaves them as they are.
+const PLAIN = { ł: 'l', ø: 'o', đ: 'd', ð: 'd', ß: 'ss', æ: 'ae', œ: 'oe', ı: 'i', þ: 'th' };
+
+// Lowercase with accents removed, so a search for "jose garcia" finds "José García".
+const fold = s => (s || '').toLowerCase().normalize('NFD').replace(/\p{M}/gu, '')
+  .replace(/[^\x00-\x7f]/g, c => PLAIN[c] ?? c);
+
 const openPickers = new Set();
 
 // A labeled row of tag chips that adds and removes names in `selected`.
@@ -157,14 +164,14 @@ function renderResumeList() {
   if (document.activeElement?.matches('input.cand-name')) return;
   const list = document.getElementById('resumeList');
   list.innerHTML = '';
-  const q = candidateQuery.trim().toLowerCase();
+  const q = fold(candidateQuery.trim());
   // A query made only of phone characters also matches on digits, whatever the stored format.
   const qDigits = /^[\d\s().+-]+$/.test(q) ? q.replace(/\D/g, '') : '';
   const visible = resumeData.filter(r => {
     if (!hasAllTags(r, activeFilters)) return false;
     if (!q) return true;
     if (qDigits && (r.phone || '').replace(/\D/g, '').includes(qDigits)) return true;
-    return [r.candidate_name, r.email, r.filename, r.phone].some(v => (v || '').toLowerCase().includes(q));
+    return [r.candidate_name, r.email, r.filename, r.phone].some(v => fold(v).includes(q));
   });
   document.getElementById('candidateCount').textContent =
     visible.length === resumeData.length ? resumeData.length || '' : `${visible.length} of ${resumeData.length}`;
@@ -462,10 +469,10 @@ function clearChatTags() {
 function showResumeSuggestions(query) {
   const box = document.getElementById('resumeSuggestions');
   if (!query.trim()) { box.style.display = 'none'; return; }
-  const q = query.toLowerCase();
+  const q = fold(query);
   const matches = resumeData.filter(r =>
     r.status === 'ready' &&
-    [r.candidate_name, r.email, r.filename].some(v => (v || '').toLowerCase().includes(q))
+    [r.candidate_name, r.email, r.filename].some(v => fold(v).includes(q))
   );
   if (!matches.length) { box.style.display = 'none'; return; }
   box.innerHTML = '';
