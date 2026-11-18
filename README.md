@@ -15,8 +15,6 @@ Upload resumes and ask questions about contents.
 - Docker Compose + Caddy
 - Terraform
 
----
-
 ## Architecture
 
 ```mermaid
@@ -52,8 +50,6 @@ flowchart TD
 **Ingest (steps 1–2):** PDF upload → chunk text → embed with Azure → store vectors in pgvector
 
 **Query (steps 3–5):** one LLM call per question. Single-resume and tag-filtered questions send every chunk in scope, no ranking or cap. Unfiltered questions take the top 2 chunks from the 40 nearest candidates by cosine similarity; rank/compare/list questions also include a one-line roster of every candidate so none get cut.
-
----
 
 ## Setup
 
@@ -91,16 +87,12 @@ gh variable set AZURE_SUBSCRIPTION_ID --body "$(terraform output -raw subscripti
 
 Push to `main` — the checks run, then the deploy.
 
----
-
 ## Tests
 
 ```bash
 pip install -r requirements.txt -r requirements-dev.txt
 pytest tests/
 ```
-
----
 
 ## API
 
