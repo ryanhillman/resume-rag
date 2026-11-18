@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+import psycopg2
 import pytest
 from fpdf import FPDF
 
@@ -121,6 +122,35 @@ def test_retry_missing_resume(client):
     with patch("app.main._get_resume_file", return_value=None):
         resp = client.post("/resumes/missing/retry")
     assert resp.status_code == 404
+
+
+# --- Ingest ---
+
+
+def test_ingest_of_a_deleted_resume_is_not_a_failure(caplog):
+    """A resume deleted while it is processing leaves its chunks nowhere to go."""
+    from app.main import _ingest
+
+    with (
+        patch("app.main._embed_texts", return_value=[[0.0]]),
+        patch("app.main._write_chunks", side_effect=psycopg2.errors.ForeignKeyViolation),
+        patch("app.main._update_resume_status") as mock_status,
+        caplog.at_level("INFO"),
+    ):
+        _ingest("gone", "r.pdf", "some resume text")
+    mock_status.assert_not_called()
+    assert [r.levelname for r in caplog.records] == ["INFO"]
+
+
+def test_ingest_failure_marks_the_resume_failed():
+    from app.main import _ingest
+
+    with (
+        patch("app.main._embed_texts", side_effect=RuntimeError("model down")),
+        patch("app.main._update_resume_status") as mock_status,
+    ):
+        _ingest("abc", "r.pdf", "some resume text")
+    mock_status.assert_called_once_with("abc", "failed")
 
 
 # --- Contact extraction ---
