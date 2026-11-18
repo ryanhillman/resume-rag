@@ -562,7 +562,13 @@ document.getElementById('scopeClear').addEventListener('click', () => {
   if (chatResumeId) clearChatCandidate();
   else clearChatTags();
 });
+// The box holds the chosen candidate's name, so editing it drops the choice.
 document.getElementById('resumeSearch').addEventListener('input', e => {
+  if (chatResumeId) {
+    chatResumeId = null;
+    chatResumeName = null;
+    renderScopeLabel();
+  }
   showResumeSuggestions(e.target.value);
 });
 document.getElementById('resumeSearch').addEventListener('blur', () => {
