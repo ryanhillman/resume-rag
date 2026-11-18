@@ -1,9 +1,9 @@
 # Resume RAG
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Azure-0078D4?logo=microsoftazure&logoColor=white" />
-  <img src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white" />
-  <img src="https://img.shields.io/badge/RAG-4B5563" />
+  <img alt="Azure" src="https://img.shields.io/badge/Azure-0078D4?logo=microsoftazure&logoColor=white" />
+  <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white" />
+  <img alt="RAG" src="https://img.shields.io/badge/RAG-4B5563" />
 </p>
 
 Upload resumes and ask questions about contents.
@@ -42,7 +42,7 @@ flowchart TD
     Embed -- "1536-dim vectors" --> App
     App -- "2 · INSERT embeddings" --> PG
 
-    App -- "3 · embed question" --> Embed
+    App -- "3 · embed question\n(unfiltered questions only)" --> Embed
     App -- "4 · cosine similarity search\n(unfiltered questions only)" --> PG
     PG -- "all chunks in scope (filtered)\ntop-2/candidate, ≤40 candidates (unfiltered)" --> App
     App -- "5 · chat completion\n(chunks + question)" --> LLM
@@ -57,6 +57,11 @@ flowchart TD
 
 ## Setup
 
+Needs Terraform, the Azure CLI (signed in) and the GitHub CLI. The repository is
+wired to one deployment: for your own, change the state storage account in
+`infra/backend.tf`, the OIDC subject in `infra/main.tf` and the clone URL in
+`.github/workflows/deploy.yml`.
+
 **1. Provision infrastructure**
 ```bash
 cd infra && cp terraform.tfvars.example terraform.tfvars  # fill in values
@@ -66,9 +71,10 @@ terraform init && terraform apply
 **2. Configure the VM's environment**
 
 Copy `.env.example` to `~/.env` on the VM and fill in every variable. The
-Azure values come from `terraform output` (`ai_endpoint`, `ai_key`) and the rest
-you choose. `DOMAIN` must be a fully-qualified hostname: the session cookie is
-`Secure`, so sign-in fails over plain HTTP.
+Azure endpoint, key and `DOMAIN` come from `terraform output` (`ai_endpoint`,
+`ai_key`, `hostname`); the rest you choose. `DOMAIN` must be that hostname:
+Caddy gets its certificate for it, and the session cookie is `Secure`, so
+sign-in fails over plain HTTP.
 
 **3. Deploy via CI/CD**
 
@@ -97,6 +103,8 @@ pytest tests/
 ---
 
 ## API
+
+✓ means a session cookie or an `X-API-Key` header.
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
