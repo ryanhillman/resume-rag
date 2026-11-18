@@ -396,6 +396,7 @@ async function uploadFile() {
     input.value = '';
     showFile();
     uploadTags.clear();
+    openPickers.delete('uploadTagRow');
     renderUploadTags();
     await refreshResumes();
     pollIngest(data.resume_id, status);
