@@ -368,6 +368,7 @@ async function deleteResume(resumeId, btn) {
     const res = await apiFetch(`/resumes/${resumeId}`, {method: 'DELETE'});
     if (!res) return;
     if (!res.ok) throw new Error(await errorText(res));
+    if (chatResumeId === resumeId) clearChatCandidate();
     await refreshResumes();
   } catch(e) {
     showError('Delete failed: ' + e.message);
