@@ -575,8 +575,10 @@ document.getElementById('resumeSearch').addEventListener('input', e => {
   }
   showResumeSuggestions(e.target.value);
 });
+// A press on a suggestion leaves focus in the box, so the list is still open when the click lands.
+document.getElementById('resumeSuggestions').addEventListener('mousedown', e => e.preventDefault());
 document.getElementById('resumeSearch').addEventListener('blur', () => {
-  setTimeout(() => { document.getElementById('resumeSuggestions').style.display = 'none'; }, 150);
+  document.getElementById('resumeSuggestions').style.display = 'none';
 });
 document.getElementById('resumeSearch').addEventListener('focus', e => {
   if (e.target.value) showResumeSuggestions(e.target.value);
