@@ -218,6 +218,18 @@
     .suggestion:hover { background: rgba(61, 85, 204, 0.1); }
     .scope-clear { font-size: var(--text-sm); font-weight: 500; letter-spacing: 0; color: var(--accent); background: none; }
     .scope-clear:hover { text-decoration: underline; }
+    /* Touch screens: controls sized for a finger. A 16px field also stops iOS zooming in when it is tapped. */
+    @media (pointer: coarse) {
+      input[type="text"], .btn-primary, .btn-secondary, .dropzone { min-height: 44px; }
+      input[type="text"] { font-size: 1rem; }
+      .tag-row { gap: 8px; }
+      .tag-chip, .tag-edit { min-height: 32px; padding-inline: 12px; border-radius: 16px; font-size: var(--text-sm); }
+      .btn-sm { width: 40px; height: 40px; }
+      .suggestion { padding-block: 13px; }
+      .toast button { width: 32px; height: 32px; }
+      .scope-clear { padding: 12px 6px; margin: -12px -6px; }
+      button { touch-action: manipulation; }
+    }
   </style>
 </head>
 <body>
