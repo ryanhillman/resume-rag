@@ -414,6 +414,7 @@ async function pollIngest(resumeId, statusEl) {
     try {
       const res = await apiFetch(`/resumes/${resumeId}`);
       if (!res) return;
+      if (!res.ok) break;
       const data = await res.json();
       if (data.status === 'ready') {
         statusEl.textContent = `${data.filename} ready.`;
