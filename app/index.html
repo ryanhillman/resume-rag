@@ -66,11 +66,11 @@
       display: flex; align-items: center; gap: 8px;
       font-size: var(--text-lg); font-weight: 650; letter-spacing: -0.01em; margin-bottom: 8px; color: var(--ink);
     }
-    .count {
+    .pill {
       font-size: var(--text-xs); font-weight: 600; letter-spacing: 0; color: var(--ink);
       background: var(--wash); padding: 1px 8px; border-radius: 999px;
     }
-    .count:empty { display: none; }
+    .pill:empty { display: none; }
     .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .dropzone {
       position: relative; flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px;
@@ -246,7 +246,7 @@
       </section>
 
       <section class="card list-card">
-        <h2>Candidates <span class="count" id="candidateCount"></span></h2>
+        <h2>Candidates <span class="pill" id="candidateCount"></span></h2>
         <input type="text" id="candidateSearch" placeholder="Filter by name, email, phone number, or file" autocomplete="off" />
         <div id="tagFilter" class="tag-row picker"></div>
         <div id="resumeList"></div>
@@ -255,7 +255,7 @@
     </div>
 
     <section class="card chat-card">
-      <h2>Ask a question <span class="count" id="scopeLabel">All candidates</span><button class="scope-clear" id="scopeClear" hidden>✕ clear</button></h2>
+      <h2>Ask a question <span class="pill" id="scopeLabel">All candidates</span><button class="scope-clear" id="scopeClear" hidden>✕ clear</button></h2>
       <div class="search-wrap">
         <input type="text" id="resumeSearch" placeholder="Type a name to ask about a candidate" autocomplete="off" />
         <div id="resumeSuggestions"></div>
