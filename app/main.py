@@ -943,25 +943,24 @@ def upload(
             detail="Could not extract text. Please upload a text-based PDF.",
         )
     content_hash = hashlib.sha256(content).hexdigest()
-    existing = _get_resume_by_hash(content_hash)
-    if existing:
-        raise HTTPException(
-            status_code=409,
-            detail=f"File already uploaded as '{existing['filename']}'.",
-        )
     resume_id = str(uuid.uuid4())
     candidate_name, email, phone = _extract_contact(text, file.filename)
-    _register_resume(
-        resume_id,
-        file.filename,
-        content,
-        flags,
-        content_hash,
-        candidate_name,
-        email,
-        phone,
-        tag_list,
-    )
+    try:
+        _register_resume(
+            resume_id,
+            file.filename,
+            content,
+            flags,
+            content_hash,
+            candidate_name,
+            email,
+            phone,
+            tag_list,
+        )
+    except psycopg2.errors.UniqueViolation:
+        # The unique index on the content hash is the duplicate check, so two uploads at once cannot both pass.
+        existing = _get_resume_by_hash(content_hash) or {"filename": file.filename}
+        raise HTTPException(status_code=409, detail=f"File already uploaded as '{existing['filename']}'.")
     background_tasks.add_task(_ingest, resume_id, file.filename, text)
     return {"resume_id": resume_id, "filename": file.filename, "status": "ingesting"}
 
