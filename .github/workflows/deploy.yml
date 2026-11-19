@@ -22,7 +22,13 @@ jobs:
       - run: docker run --rm checks ruff check app/ tests/
       - run: docker run --rm checks ruff format --check app tests
       - run: docker run --rm checks pip-audit -r requirements.txt
-      - run: docker run --rm checks pytest tests/
+      # The integration test runs against the compose file's own Postgres, on its network.
+      - run: docker compose up -d --wait postgres
+        env:
+          POSTGRES_USER: raguser
+          POSTGRES_PASSWORD: checks
+          POSTGRES_DB: rag
+      - run: docker run --rm --network resume-rag_default -e POSTGRES_PASSWORD=checks checks pytest tests/
       - run: terraform -chdir=infra init -backend=false
       - run: terraform -chdir=infra validate
       - run: terraform -chdir=infra fmt -check
