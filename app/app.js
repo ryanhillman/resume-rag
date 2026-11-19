@@ -71,6 +71,8 @@ const openPickers = new Set();
 // Closed, it shows only the picked tags; Edit opens the full set.
 function renderTagPicker(rowId, labelText, selected, onChange) {
   const row = document.getElementById(rowId);
+  // A redraw replaces every button, so focus goes to the one now in the same place.
+  const focused = [...row.querySelectorAll('button')].indexOf(document.activeElement);
   row.innerHTML = '';
   if (!ALL_TAGS.length) return;
   const open = openPickers.has(rowId);
@@ -101,6 +103,7 @@ function renderTagPicker(rowId, labelText, selected, onChange) {
     });
     row.appendChild(chip);
   }
+  if (focused !== -1) (row.querySelectorAll('button')[focused] ?? toggle).focus();
 }
 
 function renderUploadTags() {
@@ -164,6 +167,12 @@ function renderResumeList() {
   // A redraw would save and discard a name that is being typed; the next one catches up.
   if (document.activeElement?.matches('input.cand-name')) return;
   const list = document.getElementById('resumeList');
+  // A redraw replaces every row, so focus goes to the same control on the same candidate, or to the list if that is gone.
+  const active = document.activeElement;
+  const from = active.closest('#resumeList .resume-card');
+  const focused = from && `[data-id="${from.dataset.id}"] ` +
+    (active.dataset.tag ? `[data-tag="${active.dataset.tag}"]` : '.' + [...active.classList].find(c => c !== 'btn-sm'));
+  const refocus = () => focused && (list.querySelector(focused) ?? list).focus();
   list.innerHTML = '';
   const q = fold(candidateQuery.trim());
   // A query made only of phone characters also matches on digits, whatever the stored format.
@@ -179,6 +188,7 @@ function renderResumeList() {
   if (!visible.length) {
     list.innerHTML = '<p class="empty">' +
       (resumeData.length ? 'No candidates match.' : 'No candidates yet.') + '</p>';
+    refocus();
     return;
   }
   for (const r of visible) {
@@ -274,9 +284,11 @@ function renderResumeList() {
     }
     const card = document.createElement('div');
     card.className = 'resume-card';
+    card.dataset.id = resume_id;
     card.append(topRow, tagRow);
     list.appendChild(card);
   }
+  refocus();
 }
 
 async function toggleTag(resumeId, chip) {
@@ -378,6 +390,8 @@ async function deleteResume(resumeId, btn) {
     if (!res.ok) throw new Error(await errorText(res));
     if (chatResumeId === resumeId) clearChatCandidate();
     await refreshResumes();
+    // The row and its buttons are gone, so focus goes to the list they were in.
+    document.getElementById('resumeList').focus();
   } catch(e) {
     showError('Delete failed: ' + e.message);
     btn.disabled = false;
