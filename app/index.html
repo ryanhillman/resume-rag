@@ -17,8 +17,8 @@
       --line: rgba(27, 33, 64, 0.12);
       --panel: rgba(255, 255, 255, 0.8); --panel-edge: rgba(255, 255, 255, 0.95);
       --panel-shadow: 0 2px 6px rgba(22, 28, 70, 0.16), 0 22px 48px -14px rgba(22, 28, 70, 0.55);
-      /* --well fills fields and the answer box; --wash tints pills and hovered buttons. */
-      --well: #fff; --well-edge: rgba(27, 33, 64, 0.18);
+      /* --well fills fields and the answer box, and --well-edge outlines fields at 3:1 contrast; --wash tints pills and hovered buttons. */
+      --well: #fff; --well-edge: rgba(27, 33, 64, 0.6);
       --wash: rgba(27, 33, 64, 0.08);
     }
     body {
@@ -74,7 +74,7 @@
     .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .dropzone {
       position: relative; flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px;
-      padding: 7px 12px; border: 1.5px dashed rgba(27, 33, 64, 0.28); border-radius: 10px;
+      padding: 7px 12px; border: 1.5px dashed var(--well-edge); border-radius: 10px;
       background: rgba(255, 255, 255, 0.55); color: var(--muted); font-size: var(--text-md); cursor: pointer;
       transition: background 0.12s, border-color 0.12s;
     }
