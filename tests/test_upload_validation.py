@@ -192,7 +192,7 @@ def test_extract_contact_falls_back_to_filename():
 def test_name_from_a_decomposed_filename_is_composed():
     from app.main import _extract_contact
 
-    assert _extract_contact("no name here", "renée_núñez.pdf")[0] == "Renée Núñez"
+    assert _extract_contact("no name here", "rene\u0301e_nu\u0301n\u0303ez.pdf")[0] == "Renée Núñez"
 
 
 # --- File serving ---
