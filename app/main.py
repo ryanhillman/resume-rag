@@ -225,7 +225,7 @@ def require_auth(
     rag_session: Optional[str] = Cookie(None),
 ):
     """An API key or a browser session; endpoints accept either."""
-    if key and secrets.compare_digest(key, API_KEY):
+    if key and secrets.compare_digest(key.encode("utf-8"), API_KEY.encode("utf-8")):
         return
     if rag_session and _session_valid(rag_session):
         return
@@ -774,7 +774,7 @@ async def _csrf_check(request: Request, call_next):
     # azure.com is the eTLD+1; hence the Origin check. A valid API key skips it:
     # a cross-site page cannot attach that header.
     key = request.headers.get("x-api-key", "")
-    if key and secrets.compare_digest(key, API_KEY):
+    if key and secrets.compare_digest(key.encode("utf-8"), API_KEY.encode("utf-8")):
         return await call_next(request)
     if request.method not in CSRF_SAFE_METHODS:
         origin = request.headers.get("origin")
