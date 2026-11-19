@@ -144,7 +144,6 @@ const ICONS = {
   download: "<path d='M12 4v11'/><path d='M7 11l5 5 5-5'/><path d='M5 20h14'/>",
   delete: "<path d='M4 7h16'/><path d='M9 7V4h6v3'/><path d='M6 7l1 13h10l1-13'/><path d='M10 11v5M14 11v5'/>",
   retry: "<path d='M20 11a8 8 0 1 0-2.3 6'/><path d='M20 5v6h-6'/>",
-  inject: "<path d='M12 4l9 16H3z'/><path d='M12 10v4M12 17h.01'/>",
 };
 
 const svgIcon = name =>
@@ -204,6 +203,12 @@ function renderResumeList() {
     secondary.className = 'cand-file';
     secondary.textContent = [email, formatPhone(phone), filename, formatUploaded(created_at)].filter(Boolean).join(' · ');
     nameSpan.append(primary, secondary);
+    if (flags && flags.length) {
+      const warning = document.createElement('span');
+      warning.className = 'cand-flag';
+      warning.textContent = flags.map(f => FLAG_TEXT[f] || f).join(' ');
+      nameSpan.append(warning);
+    }
     const viewBtn = iconButton('view', 'View', () =>
       window.open(`/resumes/${resume_id}/file`, '_blank', 'noopener'));
     const dlBtn = iconButton('download', 'Download', () => downloadResume(resume_id, filename));
@@ -234,13 +239,6 @@ function renderResumeList() {
       statusBadge.className = `badge badge-${status}`;
       statusBadge.textContent = status === 'ingesting' ? 'processing' : status;
       topRow.appendChild(statusBadge);
-    }
-    if (flags && flags.length) {
-      const warnBadge = document.createElement('span');
-      warnBadge.className = 'badge badge-inject';
-      warnBadge.title = flags.map(f => FLAG_TEXT[f] || f).join('\n');
-      warnBadge.innerHTML = svgIcon('inject');
-      topRow.appendChild(warnBadge);
     }
     if (status === 'failed') {
       topRow.append(iconButton('retry', 'Retry', btn => retryResume(resume_id, btn)));
