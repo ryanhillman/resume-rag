@@ -234,13 +234,13 @@
 <body>
   <header class="topbar">
     <h1>Resume RAG</h1>
-    <div class="toast" id="toast"></div>
+    <div class="toast" id="toast" role="alert"></div>
     <form method="post" action="/logout">
       <button type="submit" class="btn-secondary">Sign out</button>
     </form>
   </header>
 
-  <div class="layout">
+  <main class="layout">
     <div class="rail">
       <section class="card">
         <h2>Upload resume</h2>
@@ -253,32 +253,32 @@
           <button id="uploadBtn" class="btn-primary">Upload</button>
         </div>
         <div id="uploadTagRow" class="tag-row picker"></div>
-        <div class="status" id="uploadStatus"></div>
+        <div class="status" id="uploadStatus" role="status"></div>
       </section>
 
       <section class="card list-card">
-        <h2>Candidates <span class="pill" id="candidateCount"></span></h2>
-        <input type="text" id="candidateSearch" placeholder="Filter by name, email, phone number, or file" autocomplete="off" />
+        <h2>Candidates <span class="pill" id="candidateCount" aria-live="polite"></span></h2>
+        <input type="text" id="candidateSearch" aria-label="Filter candidates" placeholder="Filter by name, email, phone number, or file" autocomplete="off" />
         <div id="tagFilter" class="tag-row picker"></div>
         <div id="resumeList"></div>
-        <div class="status" id="listStatus"></div>
+        <div class="status" id="listStatus" role="status"></div>
       </section>
     </div>
 
     <section class="card chat-card">
-      <h2>Ask a question <span class="pill" id="scopeLabel">All candidates</span><button class="scope-clear" id="scopeClear" hidden>✕ clear</button></h2>
+      <h2>Ask a question <span class="pill" id="scopeLabel" aria-live="polite">All candidates</span><button class="scope-clear" id="scopeClear" aria-label="Clear" hidden>✕ clear</button></h2>
       <div class="search-wrap">
-        <input type="text" id="resumeSearch" placeholder="Type a name to ask about a candidate" autocomplete="off" />
+        <input type="text" id="resumeSearch" aria-label="Candidate to ask about" placeholder="Type a name to ask about a candidate" autocomplete="off" />
         <div id="resumeSuggestions"></div>
       </div>
       <div id="chatTagRow" class="tag-row picker"></div>
       <div class="row">
-        <input type="text" id="messageInput" placeholder="What would you like to know?" maxlength="2000" />
+        <input type="text" id="messageInput" aria-label="Question" placeholder="What would you like to know?" maxlength="2000" />
         <button id="sendBtn" class="btn-primary">Send</button>
       </div>
-      <div id="chatOutput"></div>
+      <div id="chatOutput" aria-live="polite"></div>
     </section>
-  </div>
+  </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/18.1.3/lib/marked.umd.min.js"
         integrity="sha512-aGS0R+ig5xP86FA70qY4Rk8EstGqd6T0r60hdSAIEMN4LicYom0kwwNl6IsqQ3lYHEGsgQI0cmIRpUBl9vSpmw=="
