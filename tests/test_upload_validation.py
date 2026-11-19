@@ -66,7 +66,6 @@ def test_rejects_scanned_pdf(client):
 
 def test_accepts_valid_one_page_pdf(client):
     with (
-        patch("app.main._get_resume_by_hash", return_value=None),
         patch("app.main._register_resume"),
         patch("app.main.BackgroundTasks.add_task"),
     ):
@@ -79,16 +78,16 @@ def test_accepts_valid_one_page_pdf(client):
 
 
 def test_rejects_duplicate_upload(client):
-    with patch(
-        "app.main._get_resume_by_hash",
-        return_value={"resume_id": "existing-id", "filename": "original.pdf"},
+    with (
+        patch("app.main._register_resume", side_effect=psycopg2.errors.UniqueViolation),
+        patch("app.main._get_resume_by_hash", return_value={"resume_id": "existing-id", "filename": "original.pdf"}),
     ):
         resp = client.post(
             "/upload",
             files={"file": ("resume.pdf", _pdf(pages=1, text="Some resume text"), "application/pdf")},
         )
     assert resp.status_code == 409
-    assert "already uploaded" in resp.json()["detail"]
+    assert resp.json()["detail"] == "File already uploaded as 'original.pdf'."
 
 
 # --- Retry failed ingests ---
