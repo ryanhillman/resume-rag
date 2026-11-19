@@ -640,6 +640,10 @@ document.getElementById('resumeSearch').addEventListener('keydown', e => {
     setSuggestionsOpen(false);
   }
 });
+// Escape dismisses the error toast, which can sit over the controls in the top bar.
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') clearError();
+});
 
 loadTags();
 refreshResumes();
