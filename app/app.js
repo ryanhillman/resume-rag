@@ -18,6 +18,7 @@ function showError(text) {
   const close = document.createElement('button');
   close.textContent = '✕';
   close.title = 'Dismiss';
+  close.setAttribute('aria-label', 'Dismiss');
   close.addEventListener('click', clearError);
   document.getElementById('toast').replaceChildren(text, close);
 }
@@ -90,6 +91,7 @@ function renderTagPicker(rowId, labelText, selected, onChange) {
     if (!open && !selected.has(tag.name)) continue;
     const chip = document.createElement('button');
     chip.className = 'tag-chip' + (selected.has(tag.name) ? '' : ' off');
+    chip.setAttribute('aria-pressed', selected.has(tag.name));
     chip.style.cssText = `--tag-bg:${tag.bg};--tag-text:${tag.text}`;
     chip.textContent = tag.name;
     chip.addEventListener('click', () => {
@@ -191,6 +193,7 @@ function renderResumeList() {
       primary.value = candidate_name || '';
       primary.maxLength = 200;
       primary.placeholder = 'Candidate name';
+      primary.setAttribute('aria-label', 'Candidate name');
       primary.addEventListener('change', () => renameCandidate(resume_id, primary));
       primary.addEventListener('keydown', e => {
         if (e.key === 'Escape') primary.value = resumeData.find(x => x.resume_id === resume_id)?.candidate_name || '';
@@ -264,7 +267,7 @@ function renderResumeList() {
       chip.textContent = tag.name;
       if (editing) {
         chip.dataset.tag = tag.name;
-        chip.title = `${on ? 'Remove' : 'Add'} ${tag.name}`;
+        chip.setAttribute('aria-pressed', on);
         chip.addEventListener('click', () => toggleTag(resume_id, chip));
       }
       tagRow.appendChild(chip);

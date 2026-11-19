@@ -899,9 +899,7 @@ def login(request: Request, password: str = Form(...)):
         resp.set_cookie("rag_session", token, httponly=True, secure=True, samesite="strict", max_age=SESSION_TTL_SECS)
         return resp
     _record_failure(ip)
-    content = LOGIN_HTML.read_text(encoding="utf-8").replace(
-        "<!--ERROR-->", '<p class="error">Incorrect password.</p>'
-    )
+    content = LOGIN_HTML.read_text(encoding="utf-8").replace("<!--ERROR-->", "Incorrect password.")
     return Response(content=content, media_type="text/html", status_code=401)
 
 
