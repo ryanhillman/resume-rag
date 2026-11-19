@@ -45,7 +45,7 @@ variable "allowed_ssh_cidr" {
 }
 
 variable "allowed_app_cidr" {
-  description = "CIDR allowed to reach the web app (ports 80/443). Restrict to your office/VPN range to prevent public access to staff data: \"203.0.113.0/24\". Leaving this as \"*\" exposes the app to the public internet."
+  description = "CIDR allowed to reach the web app (ports 80/443). Keep \"*\": Caddy can obtain and renew its certificate only while the internet can reach these ports. Sign-in protects the app."
   type        = string
 }
 
