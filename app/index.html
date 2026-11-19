@@ -141,16 +141,13 @@
     .resume-row .badge { text-transform: capitalize; font-size: var(--text-xs); font-weight: 600; padding: 2px 8px; border-radius: 999px; margin-right: 4px; }
     .badge-ingesting { background: #fff1cc; color: #7a4d00; }
     .badge-failed { background: #fbe4e6; color: #a11d2b; }
-    .resume-row .badge-inject {
-      display: inline-grid; place-items: center; width: 24px; height: 24px; padding: 0;
-      background: #ffe9d6; color: #a04a00; cursor: help;
-    }
+    .cand-flag { display: block; font-size: var(--text-sm); font-weight: 500; color: #a04a00; }
     .btn-sm {
       display: inline-grid; place-items: center; width: 26px; height: 26px; padding: 0;
       border-radius: 8px; background: none; color: var(--faint); font-size: var(--text-xs);
       transition: background 0.12s, color 0.12s;
     }
-    .btn-sm svg, .badge-inject svg { width: 15px; height: 15px; }
+    .btn-sm svg { width: 15px; height: 15px; }
     .resume-card:hover .btn-sm { color: var(--ink); }
     .btn-view:hover, .btn-download:hover { background: var(--wash); }
     .resume-card .btn-delete:hover { background: #fbe4e6; color: var(--danger); }
