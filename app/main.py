@@ -750,7 +750,8 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title="Resume RAG", version="1.0.0", lifespan=lifespan)
+# FastAPI's own /docs, /redoc and /openapi.json need no sign-in, so they are off.
+app = FastAPI(title="Resume RAG", version="1.0.0", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 
 CSP = (
     "default-src 'self'; "

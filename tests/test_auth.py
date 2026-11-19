@@ -129,6 +129,11 @@ def test_invalid_session_token_returns_401(bare_client):
     assert bare_client.get("/resumes").status_code == 401
 
 
+@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json"])
+def test_fastapi_pages_are_off(bare_client, path):
+    assert bare_client.get(path).status_code == 404
+
+
 # --- CSRF ---
 
 
