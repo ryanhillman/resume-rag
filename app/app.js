@@ -469,7 +469,7 @@ function clearChatTags() {
 function showResumeSuggestions(query) {
   const box = document.getElementById('resumeSuggestions');
   if (!query.trim()) { box.style.display = 'none'; return; }
-  const q = fold(query);
+  const q = fold(query.trim());
   const matches = resumeData.filter(r =>
     r.status === 'ready' &&
     [r.candidate_name, r.email, r.filename].some(v => fold(v).includes(q))
