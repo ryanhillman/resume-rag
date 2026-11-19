@@ -86,14 +86,14 @@ jobs:
             # local but sends the real hostname, so the real cert is verified.
             domain=$(grep -m1 '^DOMAIN=' /home/azureuser/.env | cut -d= -f2- | tr -d '\r')
             for _ in $(seq 1 30); do
-              if curl -fsS -o /dev/null --resolve "$domain:443:127.0.0.1" "https://$domain/health"; then
+              if curl -fsS -o /dev/null --max-time 5 --resolve "$domain:443:127.0.0.1" "https://$domain/health"; then
                 echo "app is responding at $domain"
                 exit 0
               fi
               sleep 4
             done
             echo "no response from $domain within 120s"
-            docker compose --env-file /home/azureuser/.env logs --tail=30
+            docker compose --env-file /home/azureuser/.env logs --tail=30 app
             exit 1
         run: |
           # "$SCRIPT" expands once, so the $ references within it are read on
@@ -103,6 +103,7 @@ jobs:
             --vm-name "$VM_NAME" \
             --name deploy \
             --script "$SCRIPT" \
+            --timeout-in-seconds 900 \
             --output none
 
       - name: Report the deploy result
