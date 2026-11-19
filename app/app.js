@@ -38,7 +38,6 @@ let confirmingDeleteId = null;
 let chatResumeId = null;
 let chatResumeName = null;
 
-const DELETE_CONFIRM_MS = 4000;
 const FLAG_TEXT = {
   hidden_text: 'Hidden text was removed from this PDF.',
   instruction_like_text: 'This resume contains text that reads like instructions to an AI.',
@@ -233,16 +232,19 @@ function renderResumeList() {
         if (confirmingDeleteId === resume_id) return deleteResume(resume_id, btn);
         confirmingDeleteId = resume_id;
         renderResumeList();
-        setTimeout(() => {
-          if (confirmingDeleteId !== resume_id) return;
-          confirmingDeleteId = null;
-          renderResumeList();
-        }, DELETE_CONFIRM_MS);
+        list.querySelector(`[data-id="${resume_id}"] .btn-delete`).focus();
       },
     );
     if (confirming) {
       delBtn.classList.add('confirm');
       delBtn.textContent = 'Delete?';
+      // The question stands until it is answered: there is no time limit, and moving focus away withdraws it.
+      delBtn.addEventListener('blur', () => {
+        confirmingDeleteId = null;
+        delBtn.classList.remove('confirm');
+        delBtn.innerHTML = svgIcon('delete');
+        delBtn.title = 'Delete';
+      }, { once: true });
     }
     const topRow = document.createElement('div');
     topRow.className = 'resume-row';
