@@ -214,7 +214,7 @@
       max-height: 160px; overflow-y: auto; box-shadow: 0 14px 30px -10px rgba(22, 28, 70, 0.5);
     }
     .suggestion { padding: 7px 12px; cursor: pointer; font-size: var(--text-md); }
-    .suggestion:hover { background: rgba(61, 85, 204, 0.1); }
+    .suggestion:hover, .suggestion[aria-selected="true"] { background: rgba(61, 85, 204, 0.1); }
     .scope-clear { font-size: var(--text-sm); font-weight: 500; letter-spacing: 0; color: var(--accent); background: none; }
     .scope-clear:hover { text-decoration: underline; }
     /* Touch screens: controls sized for a finger. A 16px field also stops iOS zooming in when it is tapped. */
@@ -268,8 +268,8 @@
     <section class="card chat-card">
       <h2>Ask a question <span class="pill" id="scopeLabel" aria-live="polite">All candidates</span><button class="scope-clear" id="scopeClear" aria-label="Clear" hidden>✕ clear</button></h2>
       <div class="search-wrap">
-        <input type="text" id="resumeSearch" aria-label="Candidate to ask about" placeholder="Type a name to ask about a candidate" autocomplete="off" />
-        <div id="resumeSuggestions"></div>
+        <input type="text" id="resumeSearch" role="combobox" aria-label="Candidate to ask about" aria-autocomplete="list" aria-expanded="false" aria-controls="resumeSuggestions" placeholder="Type a name to ask about a candidate" autocomplete="off" />
+        <div id="resumeSuggestions" role="listbox" aria-label="Candidates"></div>
       </div>
       <div id="chatTagRow" class="tag-row picker"></div>
       <div class="row">
