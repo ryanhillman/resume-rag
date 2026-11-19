@@ -54,9 +54,10 @@ flowchart TD
 ## Setup
 
 Needs Terraform, the Azure CLI (signed in) and the GitHub CLI. The repository is
-wired to one deployment: for your own, change the state storage account in
-`infra/backend.tf`, the OIDC subject in `infra/main.tf` and the clone URL in
-`.github/workflows/deploy.yml`.
+wired to one deployment: for your own, set `prefix` in `terraform.tfvars` (the
+default is this deployment's hostname) and change the state storage account in
+`infra/backend.tf`, the OIDC subject in `infra/main.tf`, and the clone URL and
+VM name in `.github/workflows/deploy.yml`.
 
 **1. Provision infrastructure**
 ```bash
@@ -68,7 +69,7 @@ terraform init && terraform apply
 
 Copy `.env.example` to `~/.env` on the VM and fill in every variable. The
 Azure endpoint, key and `DOMAIN` come from `terraform output` (`ai_endpoint`,
-`ai_key`, `hostname`); the rest you choose. `DOMAIN` must be that hostname:
+`-raw ai_key`, `hostname`); the rest you choose. `DOMAIN` must be that hostname:
 Caddy gets its certificate for it, and the session cookie is `Secure`, so
 sign-in fails over plain HTTP.
 
