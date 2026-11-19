@@ -41,7 +41,7 @@ jobs:
     environment: production
     timeout-minutes: 20
     # A single-vCPU VM cannot build twice at once, and a half-finished deploy
-    # must not be cancelled. Scoped to this job so pull request checks never
+    # must not be canceled. Scoped to this job so pull request checks never
     # queue behind a deploy.
     concurrency:
       group: deploy-production
