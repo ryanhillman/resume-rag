@@ -156,7 +156,8 @@ MIN_PASSWORD_LEN = 12
 LOGIN_ATTEMPTS: dict[str, list[float]] = {}
 LOGIN_MAX_FAILURES = 5
 LOGIN_LOCKOUT_SECS = 900  # 15 minutes
-SESSION_TTL_SECS = 8 * 3600
+# Over 20 hours, the length past which WCAG does not treat a session as a time limit.
+SESSION_TTL_SECS = 24 * 3600
 
 
 def _login_ip(request: Request) -> str:
