@@ -457,7 +457,7 @@ function clearChatCandidate() {
   chatResumeId = null;
   chatResumeName = null;
   document.getElementById('resumeSearch').value = '';
-  document.getElementById('resumeSuggestions').style.display = 'none';
+  setSuggestionsOpen(false);
   renderScopeLabel();
 }
 
@@ -467,19 +467,29 @@ function clearChatTags() {
   renderScopeLabel();
 }
 
+// Opens or closes the suggestion list, and tells assistive technology which.
+function setSuggestionsOpen(open) {
+  const input = document.getElementById('resumeSearch');
+  document.getElementById('resumeSuggestions').style.display = open ? 'block' : 'none';
+  input.setAttribute('aria-expanded', open);
+  input.removeAttribute('aria-activedescendant');
+}
+
 function showResumeSuggestions(query) {
   const box = document.getElementById('resumeSuggestions');
-  if (!query.trim()) { box.style.display = 'none'; return; }
+  if (!query.trim()) { setSuggestionsOpen(false); return; }
   const q = fold(query.trim());
   const matches = resumeData.filter(r =>
     r.status === 'ready' &&
     [r.candidate_name, r.email, r.filename].some(v => fold(v).includes(q))
   );
-  if (!matches.length) { box.style.display = 'none'; return; }
+  if (!matches.length) { setSuggestionsOpen(false); return; }
   box.innerHTML = '';
   for (const r of matches.slice(0, 8)) {
     const item = document.createElement('div');
     item.className = 'suggestion';
+    item.id = `suggestion-${r.resume_id}`;
+    item.setAttribute('role', 'option');
     const label = r.candidate_name || r.filename;
     item.textContent = label;
     item.addEventListener('click', () => {
@@ -488,12 +498,12 @@ function showResumeSuggestions(query) {
       chatTags.clear();
       renderChatTags();
       document.getElementById('resumeSearch').value = label;
-      box.style.display = 'none';
+      setSuggestionsOpen(false);
       renderScopeLabel();
     });
     box.appendChild(item);
   }
-  box.style.display = 'block';
+  setSuggestionsOpen(true);
 }
 
 async function sendMessage() {
@@ -590,10 +600,29 @@ document.getElementById('resumeSuggestions').addEventListener('mousedown', e => 
 // Switching windows keeps what was typed.
 document.getElementById('resumeSearch').addEventListener('blur', e => {
   if (!chatResumeId && document.hasFocus()) e.target.value = '';
-  document.getElementById('resumeSuggestions').style.display = 'none';
+  setSuggestionsOpen(false);
 });
 document.getElementById('resumeSearch').addEventListener('focus', e => {
   if (e.target.value) showResumeSuggestions(e.target.value);
+});
+// Arrow keys move through the open list, Enter picks the highlighted name or the first, Escape closes the list.
+document.getElementById('resumeSearch').addEventListener('keydown', e => {
+  if (e.target.getAttribute('aria-expanded') !== 'true') return;
+  const items = [...document.querySelectorAll('#resumeSuggestions .suggestion')];
+  const at = items.findIndex(i => i.getAttribute('aria-selected') === 'true');
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    const step = e.key === 'ArrowDown' ? 1 : -1;
+    const next = items.at((at === -1 && step === -1 ? 0 : at) + step) ?? items[0];
+    items[at]?.removeAttribute('aria-selected');
+    next.setAttribute('aria-selected', 'true');
+    e.target.setAttribute('aria-activedescendant', next.id);
+    next.scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'Enter') {
+    (items[at] ?? items[0]).click();
+  } else if (e.key === 'Escape') {
+    setSuggestionsOpen(false);
+  }
 });
 
 loadTags();
