@@ -52,7 +52,7 @@ def test_suspicious_visible_text_flagged():
 def test_decomposed_accents_are_composed():
     """A PDF may write é as e followed by a combining accent; the text keeps one character."""
     page = MagicMock()
-    page.extract_text.return_value = page.filter.return_value.extract_text.return_value = "José García"
+    page.extract_text.return_value = page.filter.return_value.extract_text.return_value = "Jose\u0301 Garci\u0301a"
     with patch("app.main.pdfplumber.open") as opened:
         opened.return_value.__enter__.return_value.pages = [page]
         text, _flags, _pages = _extract_visible_text(b"")
