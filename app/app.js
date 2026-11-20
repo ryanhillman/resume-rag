@@ -245,6 +245,8 @@ function renderResumeList() {
         delBtn.innerHTML = svgIcon('delete');
         delBtn.title = 'Delete';
       }, { once: true });
+      // A press leaves focus on the button, so the question still stands when the click lands. Safari takes focus off a pressed button.
+      delBtn.addEventListener('mousedown', e => e.preventDefault());
     }
     const topRow = document.createElement('div');
     topRow.className = 'resume-row';
