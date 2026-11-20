@@ -143,7 +143,8 @@
     .badge-failed { background: #fbe4e6; color: #a11d2b; }
     .cand-flag { display: block; font-size: var(--text-sm); font-weight: 500; color: #a04a00; }
     .btn-sm {
-      display: inline-grid; place-items: center; width: 26px; height: 26px; padding: 0;
+      --size: 26px;
+      display: inline-grid; place-items: center; width: var(--size); height: var(--size); padding: 0;
       border-radius: 8px; background: none; color: var(--faint); font-size: var(--text-xs);
       transition: background 0.12s, color 0.12s;
     }
@@ -151,7 +152,11 @@
     .resume-card:hover .btn-sm { color: var(--ink); }
     .btn-view:hover, .btn-download:hover { background: var(--wash); }
     .resume-card .btn-delete:hover { background: #fbe4e6; color: var(--danger); }
-    .resume-card .btn-delete.confirm { width: auto; padding: 0 10px; background: var(--danger); color: #fff; font-weight: 600; }
+    /* The question covers the download button beside it, so asking and withdrawing it leave every row where it is. */
+    .resume-card .btn-delete.confirm {
+      width: auto; min-width: calc(2 * var(--size) + 2px); margin-left: calc(-1 * var(--size) - 2px); padding: 0 4px;
+      background: var(--danger); color: #fff; font-weight: 600;
+    }
     .resume-card .btn-retry { background: #fff1cc; color: #7a4d00; }
     .resume-card .btn-retry:hover { background: #ffe39a; }
     #resumeList { overflow-y: auto; flex: 1; min-height: 0; margin: 0 -8px; scrollbar-width: thin; scrollbar-color: rgba(27, 33, 64, 0.3) transparent; }
@@ -223,7 +228,7 @@
       input[type="text"] { font-size: 1rem; }
       .tag-row { gap: 8px; }
       .tag-chip, .tag-edit { min-height: 32px; padding-inline: 12px; border-radius: 16px; font-size: var(--text-sm); }
-      .btn-sm { width: 40px; height: 40px; }
+      .btn-sm { --size: 40px; }
       .suggestion { padding-block: 13px; }
       .toast button { width: 32px; height: 32px; }
       .scope-clear { padding: 12px 6px; margin: -12px -6px; }
