@@ -93,7 +93,6 @@ TAGS: dict[str, dict[str, str]] = {
     "SQL": {"bg": "#fbcfe8", "text": "#831843"},
     "PostgreSQL": {"bg": "#c084fc", "text": "#3b0764"},
     "NoSQL": {"bg": "#2dd4bf", "text": "#042f2e"},
-    "Mobile": {"bg": "#818cf8", "text": "#1e1b4b"},
     "C#": {"bg": "#a5b4fc", "text": "#312e81"},
     "R": {"bg": "#f472b6", "text": "#500724"},
     "ML": {"bg": "#38bdf8", "text": "#082f49"},
