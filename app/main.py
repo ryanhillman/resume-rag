@@ -91,6 +91,8 @@ TAGS: dict[str, dict[str, str]] = {
     "Python": {"bg": "#60a5fa", "text": "#172554"},
     "JavaScript": {"bg": "#fbbf24", "text": "#451a03"},
     "SQL": {"bg": "#fbcfe8", "text": "#831843"},
+    "PostgreSQL": {"bg": "#c084fc", "text": "#3b0764"},
+    "NoSQL": {"bg": "#2dd4bf", "text": "#042f2e"},
     "Mobile": {"bg": "#818cf8", "text": "#1e1b4b"},
     "C#": {"bg": "#a5b4fc", "text": "#312e81"},
     "R": {"bg": "#f472b6", "text": "#500724"},
@@ -103,8 +105,6 @@ TAGS: dict[str, dict[str, str]] = {
     "GCP": {"bg": "#a3e635", "text": "#365314"},
     "Azure": {"bg": "#0e7490", "text": "#ffffff"},
     "Oracle": {"bg": "#f87171", "text": "#450a0a"},
-    "Data": {"bg": "#2dd4bf", "text": "#042f2e"},
-    "IaC": {"bg": "#c084fc", "text": "#3b0764"},
     "DevOps": {"bg": "#047857", "text": "#ffffff"},
     "Networks": {"bg": "#67e8f9", "text": "#164e63"},
     "Security": {"bg": "#fda4af", "text": "#4c0519"},
@@ -336,6 +336,12 @@ def _init_db():
             """)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_resume_chunks_resume ON resume_chunks (resume_id)")
             cur.execute("UPDATE resumes SET status = 'failed' WHERE status = 'ingesting'")
+            # A resume keeps only tags that are defined, so one removed from TAGS cannot block later edits.
+            cur.execute(
+                "UPDATE resumes SET tags = ARRAY(SELECT t FROM unnest(tags) AS t WHERE t = ANY(%(known)s))"
+                " WHERE NOT tags <@ %(known)s",
+                {"known": list(TAGS)},
+            )
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS sessions (
                     token      TEXT PRIMARY KEY,

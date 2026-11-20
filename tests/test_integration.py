@@ -8,7 +8,7 @@ import pytest
 from fpdf import FPDF
 
 # Imported here because the shared client fixture patches this name for the session.
-from app.main import _init_db
+from app.main import _init_db, _set_resume_tags
 
 pytestmark = pytest.mark.skipif(not os.environ.get("POSTGRES_PASSWORD"), reason="needs Postgres")
 
@@ -52,6 +52,12 @@ def test_a_resume_from_upload_to_delete(client):
             assert renamed.json()["candidate_name"] == "Dana W."
             assert client.put(f"/resumes/{resume_id}/tags", json={"tags": ["Senior"]}).status_code == 200
             assert client.get(f"/resumes/{resume_id}").json()["status"] == "ready"
+
+            # A tag that is no longer defined is dropped the next time the app starts.
+            _set_resume_tags(resume_id, ["Senior", "Retired"])
+            _init_db()
+            listed = next(r for r in client.get("/resumes").json()["resumes"] if r["resume_id"] == resume_id)
+            assert listed["tags"] == ["Senior"]
 
             again = client.post("/upload", files=upload)
             assert again.status_code == 409
