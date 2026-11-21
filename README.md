@@ -8,6 +8,8 @@
 
 Upload resumes and ask questions about contents.
 
+Built and tested to WCAG 2.2 AA standards for business use.
+
 **Tech Stack**
 - FastAPI
 - Azure OpenAI + VM
