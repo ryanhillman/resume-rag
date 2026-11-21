@@ -20,7 +20,7 @@ click==8.5.1
     # via uvicorn
 cryptography==50.0.2
     # via pdfminer-six
-fastapi==0.162.4
+fastapi==0.163.2
     # via -r requirements.in
 h11==0.16.0
     # via uvicorn
@@ -46,7 +46,7 @@ pydantic-core==2.50.4
     # via pydantic
 pypdfium2==5.15.2
     # via pdfplumber
-python-multipart==0.0.33
+python-multipart==0.0.34
     # via -r requirements.in
 requests==2.34.2
     # via -r requirements.in
