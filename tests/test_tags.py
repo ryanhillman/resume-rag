@@ -53,6 +53,13 @@ def test_patch_contact_returns_full_row(client):
     mock_update.assert_called_once_with("abc", {"email": "new@example.com"})
 
 
+def test_patch_contact_null_clears_a_field(client):
+    with patch("app.main._update_resume_contact", return_value={"resume_id": "abc", "phone": None}) as mock_update:
+        res = client.patch("/resumes/abc", json={"phone": None})
+    assert res.status_code == 200
+    mock_update.assert_called_once_with("abc", {"phone": None})
+
+
 def test_patch_contact_rejects_empty_body(client):
     res = client.patch("/resumes/abc", json={})
     assert res.status_code == 400

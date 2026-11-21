@@ -4,11 +4,13 @@ async function apiFetch(url, opts = {}) {
   return res;
 }
 
-// FastAPI puts an error's message in "detail". The proxy's own replies have no body.
+// FastAPI puts an error's message in "detail": a string, or a list when a field is not valid, where
+// pydantic puts "Value error, " before a validator's own message. The proxy's own replies have no body.
 async function errorText(res) {
   try {
     const { detail } = await res.json();
     if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail)) return detail[0].msg.replace('Value error, ', '');
   } catch {}
   return res.status === 413 ? 'File too large.' : `Something went wrong (${res.status}).`;
 }
@@ -162,9 +164,27 @@ function iconButton(kind, label, onClick) {
   return btn;
 }
 
+// An edit box for one of a candidate's contact fields. It saves on change, and Escape puts the saved value back.
+function contactInput(resume, field, className, label, maxLength) {
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = className;
+  input.value = resume[field] || '';
+  input.maxLength = maxLength;
+  input.placeholder = label;
+  input.autocomplete = 'off';
+  input.setAttribute('aria-label', label);
+  input.addEventListener('change', () => saveContact(resume.resume_id, field, input));
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Escape') input.value = resumeData.find(r => r.resume_id === resume.resume_id)?.[field] || '';
+    if (e.key === 'Enter' || e.key === 'Escape') input.blur();
+  });
+  return input;
+}
+
 function renderResumeList() {
-  // A redraw would save and discard a name that is being typed; the next one catches up.
-  if (document.activeElement?.matches('input.cand-name')) return;
+  // A redraw would save and discard a value that is being typed; the next one catches up.
+  if (document.activeElement?.matches('.resume-row input')) return;
   const list = document.getElementById('resumeList');
   // A redraw replaces every row, so focus goes to the same control on the same candidate, or to the list if that is gone.
   const active = document.activeElement;
@@ -195,26 +215,23 @@ function renderResumeList() {
     const editing = editingId === resume_id;
     const nameSpan = document.createElement('span');
     nameSpan.className = 'name';
-    const primary = document.createElement(editing ? 'input' : 'span');
-    primary.className = 'cand-name';
-    if (editing) {
-      primary.type = 'text';
-      primary.value = candidate_name || '';
-      primary.maxLength = 200;
-      primary.placeholder = 'Candidate name';
-      primary.setAttribute('aria-label', 'Candidate name');
-      primary.addEventListener('change', () => renameCandidate(resume_id, primary));
-      primary.addEventListener('keydown', e => {
-        if (e.key === 'Escape') primary.value = resumeData.find(x => x.resume_id === resume_id)?.candidate_name || '';
-        if (e.key === 'Enter' || e.key === 'Escape') primary.blur();
-      });
-    } else {
-      primary.textContent = candidate_name || filename;
-    }
     const secondary = document.createElement('span');
     secondary.className = 'cand-file';
-    secondary.textContent = [email, formatPhone(phone), filename, formatUploaded(created_at)].filter(Boolean).join(' · ');
-    nameSpan.append(primary, secondary);
+    if (editing) {
+      nameSpan.append(
+        contactInput(r, 'candidate_name', 'cand-name', 'Candidate name', 200),
+        contactInput(r, 'email', 'cand-email', 'Email', 254),
+        contactInput(r, 'phone', 'cand-phone', 'Phone', 50),
+      );
+      secondary.textContent = [filename, formatUploaded(created_at)].filter(Boolean).join(' · ');
+    } else {
+      const primary = document.createElement('span');
+      primary.className = 'cand-name';
+      primary.textContent = candidate_name || filename;
+      nameSpan.append(primary);
+      secondary.textContent = [email, formatPhone(phone), filename, formatUploaded(created_at)].filter(Boolean).join(' · ');
+    }
+    nameSpan.append(secondary);
     if (flags && flags.length) {
       const warning = document.createElement('span');
       warning.className = 'cand-flag';
@@ -266,7 +283,7 @@ function renderResumeList() {
     const editBtn = document.createElement('button');
     editBtn.className = 'tag-edit';
     editBtn.textContent = editing ? 'Done' : 'Edit';
-    if (!editing) editBtn.title = 'Edit name and tags';
+    if (!editing) editBtn.title = 'Edit details and tags';
     editBtn.addEventListener('click', () => {
       editingId = editing ? null : resume_id;
       renderResumeList();
@@ -322,31 +339,33 @@ async function toggleTag(resumeId, chip) {
 }
 
 // Not redrawn on success: the change fires as Done is clicked, and a redraw would swallow that click.
-async function renameCandidate(resumeId, input) {
+// A name is required, so an empty name box goes back to the saved name. An empty email or phone box clears that field.
+async function saveContact(resumeId, field, input) {
   const resume = resumeData.find(r => r.resume_id === resumeId);
   if (!resume) return;
-  const prev = resume.candidate_name;
-  const next = input.value.trim();
-  if (!next || next === prev) { input.value = prev || ''; return; }
-  resume.candidate_name = next;
+  const prev = resume[field] || null;
+  const next = input.value.trim() || null;
+  if (next === prev || (!next && field === 'candidate_name')) { input.value = prev || ''; return; }
+  resume[field] = next;
   clearError();
   try {
     const res = await apiFetch(`/resumes/${resumeId}`, {
       method: 'PATCH',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({candidate_name: next}),
+      body: JSON.stringify({[field]: next}),
     });
     if (!res) return;
     if (!res.ok) throw new Error(await errorText(res));
-    if (chatResumeId === resumeId) {
+    if (field === 'candidate_name' && chatResumeId === resumeId) {
       chatResumeName = next;
       document.getElementById('resumeSearch').value = next;
       renderScopeLabel();
     }
   } catch(e) {
-    resume.candidate_name = prev;
+    resume[field] = prev;
+    input.value = prev || '';
     renderResumeList();
-    showError('Rename failed: ' + e.message);
+    showError('Update failed: ' + e.message);
   }
 }
 
