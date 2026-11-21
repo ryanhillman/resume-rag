@@ -42,7 +42,7 @@ let chatResumeName = null;
 
 const FLAG_TEXT = {
   hidden_text: 'Hidden text was removed from this PDF.',
-  instruction_like_text: 'This resume contains text that reads like instructions to an AI.',
+  instruction_like_text: 'This resume contains text that reads like instructions to AI.',
 };
 
 async function loadTags() {
