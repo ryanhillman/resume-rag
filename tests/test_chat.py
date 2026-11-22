@@ -184,6 +184,20 @@ def test_failed_model_call_is_a_readable_error(client, outcome, status):
     assert res.json()["detail"].startswith("The model")
 
 
+def test_an_answer_lost_to_reasoning_says_so(client):
+    resp = MagicMock()
+    resp.json.return_value = {"choices": [{"message": {"content": ""}, "finish_reason": "length"}]}
+    with (
+        patch("app.main._fetch_all_chunks", return_value=["chunk"]),
+        patch("app.main._get_candidates", return_value=[]),
+        patch("app.main.requests.post", return_value=resp),
+    ):
+        res = client.post("/chat", json={"message": "build a team", "resume_ids": ["id-1"]})
+
+    assert res.status_code == 502
+    assert res.json()["detail"] == "The model ran out of room to answer. Try a narrower question."
+
+
 def test_failed_completion_call_is_a_readable_error(client):
     """An explicit scope skips the embedding, so this is the completion call failing."""
     with (

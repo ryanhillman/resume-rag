@@ -734,7 +734,11 @@ def _call_llm(message: str, chunks: list[str], scope_note: str = "") -> str:
     body = resp.json()
     choice = body["choices"][0]
     log.info("LLM finish_reason=%s usage=%s", choice.get("finish_reason"), body.get("usage"))
-    return choice["message"]["content"] or ""
+    answer = choice["message"]["content"] or ""
+    # Reasoning used every output token before any answer was written.
+    if not answer.strip() and choice.get("finish_reason") == "length":
+        raise HTTPException(status_code=502, detail="The model ran out of room to answer. Try a narrower question.")
+    return answer
 
 
 # ── App lifecycle ──────────────────────────────────────────────────────────────
