@@ -131,22 +131,6 @@ def _parse_tags(raw: str) -> list[str]:
 
 # ── Authentication and sessions ───────────────────────────────────────────────
 
-WEAK_PASSWORDS: frozenset[str] = frozenset(
-    {
-        "change_me",
-        "changeme",
-        "password",
-        "password1",
-        "password123",
-        "admin",
-        "admin123",
-        "letmein",
-        "123456",
-        "secret",
-        "welcome",
-        "default",
-    }
-)
 MIN_PASSWORD_LEN = 12
 
 # ip → failure timestamps
@@ -750,8 +734,6 @@ async def lifespan(_app: FastAPI):
         raise RuntimeError("UI_PASSWORD must be set")
     if len(UI_PASSWORD) < MIN_PASSWORD_LEN:
         raise RuntimeError(f"UI_PASSWORD must be at least {MIN_PASSWORD_LEN} characters")
-    if UI_PASSWORD.lower() in WEAK_PASSWORDS:
-        raise RuntimeError("UI_PASSWORD is a known-weak value; choose a stronger password")
     if not AZURE_OPENAI_ENDPOINT or not AZURE_OPENAI_API_KEY:
         raise RuntimeError("AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY must be set")
     _init_db()
