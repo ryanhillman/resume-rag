@@ -62,9 +62,9 @@ MAX_POOL_CANDIDATES = 40  # similarity-ranked candidates for unfiltered question
 ROSTER_PREVIEW_CHARS = 120  # of each candidate's text, stored and shown
 EMBED_TIMEOUT_SECS = 30
 LLM_TIMEOUT_SECS = 60
-LLM_MAX_OUTPUT_TOKENS = 4096
-# The model's reasoning is paid for from the output tokens, so low effort leaves room for the answer.
-LLM_REASONING_EFFORT = "low"
+# The output tokens pay for the model's reasoning as well as its answer.
+LLM_MAX_OUTPUT_TOKENS = 8192
+LLM_REASONING_EFFORT = "medium"
 
 ALLOWED_EXTENSIONS = {".pdf"}
 INDEX_HTML = pathlib.Path(__file__).parent / "index.html"
