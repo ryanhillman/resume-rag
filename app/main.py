@@ -63,6 +63,8 @@ ROSTER_PREVIEW_CHARS = 120  # of each candidate's text, stored and shown
 EMBED_TIMEOUT_SECS = 30
 LLM_TIMEOUT_SECS = 60
 LLM_MAX_OUTPUT_TOKENS = 4096
+# The model's reasoning is paid for from the output tokens, so low effort leaves room for the answer.
+LLM_REASONING_EFFORT = "low"
 
 ALLOWED_EXTENSIONS = {".pdf"}
 INDEX_HTML = pathlib.Path(__file__).parent / "index.html"
@@ -724,6 +726,7 @@ def _call_llm(message: str, chunks: list[str], scope_note: str = "") -> str:
                 {"role": "user", "content": user_msg},
             ],
             "max_completion_tokens": LLM_MAX_OUTPUT_TOKENS,
+            "reasoning_effort": LLM_REASONING_EFFORT,
         },
         timeout=LLM_TIMEOUT_SECS,
     )
