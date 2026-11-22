@@ -14,3 +14,4 @@ venv/
 .gitignore
 .pre-commit-config.yaml
 README.md
+docs/
