@@ -1010,7 +1010,7 @@ def chat(req: ChatRequest):
         return {"answer": "No relevant resume content found.", "sources": sources}
     answer = _call_llm(req.message, chunks, scope_note)
     if not answer or not answer.strip():
-        raise HTTPException(status_code=502, detail="Model returned an empty response.")
+        raise HTTPException(status_code=502, detail="The model returned an empty response.")
     return {"answer": answer, "sources": sources}
 
 
