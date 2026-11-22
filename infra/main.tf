@@ -149,7 +149,7 @@ resource "azurerm_cognitive_deployment" "llm" {
 
   sku {
     name     = "GlobalStandard"
-    capacity = 20
+    capacity = 100
   }
 
   lifecycle {
