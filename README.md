@@ -10,7 +10,14 @@ Upload resumes and ask questions about contents.
 
 Built and tested to WCAG 2.2 AA standards for business use.
 
-**Tech Stack**
+## [Demo](https://youtu.be/_k4RPeDIqqk)
+
+## Screenshot
+
+![Resume RAG: uploading and the candidate list on the left, a question and its answer on the right](docs/screenshot.png)
+
+## Tech Stack
+
 - FastAPI
 - Azure OpenAI + VM
 - PostgreSQL + pgvector
