@@ -4,4 +4,4 @@ fpdf2==2.9.0
 httpx2==2.16.2
 pip-audit==2.10.1
 pytest==9.2.0
-ruff==0.17.5
+ruff==0.17.6
